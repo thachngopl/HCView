@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -14,7 +14,7 @@ unit HCPageBreakItem;
 interface
 
 uses
-  HCRectItem, HCStyle, HCCommon;
+  Windows, HCRectItem, HCStyle, HCCommon, HCCustomData;
 
 type
   TPageBreakItem = class(THCCustomRectItem)
@@ -22,19 +22,29 @@ type
     function JustifySplit: Boolean; override;
     //function GetOffsetAt(const X: Integer): Integer; override;
   public
-    constructor Create(const AWidth, AHeight: Integer); override;
+    constructor Create(const AOwnerData: THCCustomData); override;
   end;
 
 implementation
 
 { TPageBreakItem }
 
-constructor TPageBreakItem.Create(const AWidth, AHeight: Integer);
+constructor TPageBreakItem.Create(const AOwnerData: THCCustomData);
 begin
-  inherited Create;
-  StyleNo := THCStyle.RsPageBreak;
+  inherited Create(AOwnerData);
+  StyleNo := THCStyle.PageBreak;
+
   Width := 0;
-  Height := AHeight;
+  if AOwnerData.CurStyleNo > THCStyle.Null then
+  begin
+    AOwnerData.Style.ApplyTempStyle(AOwnerData.CurStyleNo);
+    Height := AOwnerData.Style.TextStyles[AOwnerData.CurStyleNo].FontHeight;
+  end
+  else
+  begin
+    AOwnerData.Style.ApplyTempStyle(0);
+    Height := AOwnerData.Style.TextStyles[0].FontHeight;
+  end;
 end;
 
 {function TPageBreakItem.GetOffsetAt(const X: Integer): Integer;

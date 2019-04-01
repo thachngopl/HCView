@@ -1,11 +1,11 @@
-{*******************************************************}
+ï»¿{*******************************************************}
 {                                                       }
-{               HCView V1.0  ×÷Õß£º¾£Í¨                 }
+{               HCView V1.1  ä½œè€…ï¼šè†é€š                 }
 {                                                       }
-{      ±¾´úÂë×ñÑ­BSDĞ­Òé£¬Äã¿ÉÒÔ¼ÓÈëQQÈº 649023932      }
-{            À´»ñÈ¡¸ü¶àµÄ¼¼Êõ½»Á÷ 2018-5-4              }
+{      æœ¬ä»£ç éµå¾ªBSDåè®®ï¼Œä½ å¯ä»¥åŠ å…¥QQç¾¤ 649023932      }
+{            æ¥è·å–æ›´å¤šçš„æŠ€æœ¯äº¤æµ 2018-5-4              }
 {                                                       }
-{                 ÎÄµµ¶ÔÏó»ù±¾¹ÜÀíµ¥Ôª                  }
+{                 æ–‡æ¡£å¯¹è±¡åŸºæœ¬ç®¡ç†å•å…ƒ                  }
 {                                                       }
 {*******************************************************}
 
@@ -14,130 +14,145 @@ unit HCCustomData;
 interface
 
 uses
-  Windows, Classes, Types, Controls, Graphics, HCItem, HCDrawItem,
-  HCStyle, HCParaStyle, HCTextStyle, HCStyleMatch, HCCommon;
+  Windows, Classes, Types, Controls, Graphics, HCItem, HCDrawItem, HCStyle,
+  HCParaStyle, HCTextStyle, HCStyleMatch, HCCommon, HCUndo, HCXml, HCList;
 
 type
-  TSelectInfo = class
+  TSelectInfo = class(TObject)
   strict private
-    FStartItemNo,  // ²»ÄÜÊ¹ÓÃDrawItem¼ÇÂ¼£¬ÒòÎªÄÚÈİ±ä¶¯Ê±ItemµÄÖ¸¶¨Offset¶ÔÓ¦µÄDrawItem£¬¿ÉÄÜºÍ±ä¶¯Ç°²»Ò»Ñù
-    FStartItemOffset,  // Ñ¡ÖĞÆğÊ¼ÔÚµÚ¼¸¸ö×Ö·ûºóÃæ£¬0±íÊ¾ÔÚItem×îÇ°Ãæ
+    FStartItemNo,  // ä¸èƒ½ä½¿ç”¨DrawItemè®°å½•ï¼Œå› ä¸ºå†…å®¹å˜åŠ¨æ—¶Itemçš„æŒ‡å®šOffsetå¯¹åº”çš„DrawItemï¼Œå¯èƒ½å’Œå˜åŠ¨å‰ä¸ä¸€æ ·
+    FStartItemOffset,  // é€‰ä¸­èµ·å§‹åœ¨ç¬¬å‡ ä¸ªå­—ç¬¦åé¢ï¼Œ0è¡¨ç¤ºåœ¨Itemæœ€å‰é¢
     FEndItemNo,
-    FEndItemOffset  // Ñ¡ÖĞ½áÊøÔÚµÚ¼¸¸ö×Ö·ûºóÃæ
+    FEndItemOffset  // é€‰ä¸­ç»“æŸåœ¨ç¬¬å‡ ä¸ªå­—ç¬¦åé¢
       : Integer;
   public
-    constructor Create;
-    procedure Initialize;
+    constructor Create; virtual;
+    procedure Initialize; virtual;
 
-    /// <summary> Ñ¡ÖĞÆğÊ¼ItemĞòºÅ </summary>
+    /// <summary> é€‰ä¸­èµ·å§‹Itemåºå· </summary>
     property StartItemNo: Integer read FStartItemNo write FStartItemNo;
 
     property StartItemOffset: Integer read FStartItemOffset write FStartItemOffset;
 
-    /// <summary> Ñ¡ÖĞ½áÊøItemĞòºÅ </summary>
+    /// <summary> é€‰ä¸­ç»“æŸItemåºå· </summary>
     property EndItemNo: Integer read FEndItemNo write FEndItemNo;
 
     property EndItemOffset: Integer read FEndItemOffset write FEndItemOffset;
   end;
 
-  TDrawOption = (doFontBackColor {»æÖÆÎÄ±¾±³¾°£¬±ÜÃâÈ«Ñ¡ÖĞÊ±²»±ØÒªµÄ»æÖÆ});
-  TDrawOptions = set of TDrawOption;
-
-  THCCustomData = class(TObject)  // ÎªÖ§³ÖÓò£¬ËùÒÔ²»ÄÜÓĞÌ«¶àÊôĞÔ£¬ÒÔÃâºÍCustomRichData³åÍ»
+  THCCustomData = class(TObject)  // ä¸ºæ”¯æŒåŸŸï¼Œæ‰€ä»¥ä¸èƒ½æœ‰å¤ªå¤šå±æ€§ï¼Œä»¥å…å’ŒRichDataå†²çª
   private
     FStyle: THCStyle;
+    FCurStyleNo, FCurParaNo: Integer;
     FItems: THCItems;
     FDrawItems: THCDrawItems;
     FSelectInfo: TSelectInfo;
     FDrawOptions: TDrawOptions;
-    FCaretDrawItemNo: Integer;  // µ±Ç°Item¹â±ê´¦µÄDrawItemÏŞ¶¨ÆäÖ»ÔÚÏà¹ØµÄ¹â±ê´¦ÀíÖĞÊ¹ÓÃ(½â¾öÍ¬Ò»Item·ÖĞĞºóOffsetÎªĞĞÎ²Ê±²»ÄÜÇø·ÖÊÇÉÏĞĞÎ²»¹ÊÇÏÂĞĞÊ¼)
-    procedure DrawItemPaintBefor(const AData: THCCustomData; const ADrawItemIndex: Integer;
+    FCaretDrawItemNo: Integer;  // å½“å‰Itemå…‰æ ‡å¤„çš„DrawItemé™å®šå…¶åªåœ¨ç›¸å…³çš„å…‰æ ‡å¤„ç†ä¸­ä½¿ç”¨(è§£å†³åŒä¸€Itemåˆ†è¡ŒåOffsetä¸ºè¡Œå°¾æ—¶ä¸èƒ½åŒºåˆ†æ˜¯ä¸Šè¡Œå°¾è¿˜æ˜¯ä¸‹è¡Œå§‹)
+    FOnGetUndoList: TGetUndoListEvent;
+    FOnCurParaNoChange: TNotifyEvent;
+    procedure DrawItemPaintBefor(const AData: THCCustomData; const ADrawItemNo: Integer;
       const ADrawRect: TRect; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
       ADataScreenBottom: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
-    procedure DrawItemPaintAfter(const AData: THCCustomData; const ADrawItemIndex: Integer;
+    procedure DrawItemPaintAfter(const AData: THCCustomData; const ADrawItemNo: Integer;
       const ADrawRect: TRect; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
       ADataScreenBottom: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
+    procedure DrawItemPaintContent(const AData: THCCustomData; const ADrawItemNo: Integer;
+      const ADrawRect, AClearRect: TRect; const ADrawText: string; const ADataDrawLeft,
+      ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
+      const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
+    procedure SetCurStyleNo(const Value: Integer);
+    procedure SetCurParaNo(const Value: Integer);
   protected
-    /// <summary> ´¦ÀíÑ¡ÖĞ·¶Î§ÄÚItemµÄÈ«Ñ¡ÖĞ¡¢²¿·ÖÑ¡ÖĞ×´Ì¬ </summary>
+    function CreateItemByStyle(const AStyleNo: Integer): THCCustomItem; virtual;
+
+    /// <summary> å¤„ç†é€‰ä¸­èŒƒå›´å†…Itemçš„å…¨é€‰ä¸­ã€éƒ¨åˆ†é€‰ä¸­çŠ¶æ€ </summary>
     procedure MatchItemSelectState;
-    /// <summary> Ê½»¯Ê±£¬¼ÇÂ¼ÆğÊ¼DrawItemºÍ¶Î×îºóµÄDrawItem </summary>
-    /// <param name="AStartItemNo"></param>
-    procedure FormatItemPrepare(const AStartItemNo: Integer; const AEndItemNo: Integer = -1);
 
-    /// <summary>
-    /// ×ª»»Ö¸¶¨ItemÖ¸¶¨Offs¸ñÊ½»¯ÎªDItem
-    /// </summary>
-    /// <param name="AItemNo">Ö¸¶¨µÄItem</param>
-    /// <param name="AOffs">Ö¸¶¨µÄ¸ñÊ½»¯ÆğÊ¼Î»ÖÃ</param>
-    /// <param name="AContentWidth">µ±Ç°Data¸ñÊ½»¯¿í¶È</param>
-    /// <param name="APageContenBottom">µ±Ç°Ò³¸ñÊ½»¯µ×²¿Î»ÖÃ</param>
-    /// <param name="APos">ÆğÊ¼Î»ÖÃ</param>
-    /// <param name="ALastDNo">ÆğÊ¼DItemNoÇ°Ò»¸öÖµ</param>
-    /// <param name="vPageBoundary">Êı¾İÒ³µ×²¿±ß½ç</param>
-    procedure _FormatItemToDrawItems(const AItemNo, AOffs, AContentWidth: Integer;
-      var APos: TPoint; var ALastDNo: Integer);
-
-    /// <summary>
-    /// »ñÈ¡DItemÖĞÖ¸¶¨Æ«ÒÆ´¦µÄÄÚÈİ»æÖÆ¿í¶È
-    /// </summary>
-    /// <param name="ADrawItemNo"></param>
-    /// <param name="ADrawOffs">Ïà¶ÔÓëDItemµÄCharOffsµÄOffs</param>
-    /// <returns></returns>
-    function GetDrawItemOffsetWidth(const ADrawItemNo, ADrawOffs: Integer): Integer;
-
-    /// <summary> ¸ù¾İÖ¸¶¨Item»ñÈ¡ÆäËùÔÚ¶ÎµÄÆğÊ¼ºÍ½áÊøItemNo </summary>
-    /// <param name="AFirstItemNo1">Ö¸¶¨</param>
-    /// <param name="AFirstItemNo">ÆğÊ¼</param>
-    /// <param name="ALastItemNo">½áÊø</param>
-    procedure GetParaItemRang(const AItemNo: Integer;
-      var AFirstItemNo, ALastItemNo: Integer);
+    /// <summary> æ ¹æ®æŒ‡å®šItemè·å–å…¶æ‰€åœ¨æ®µçš„èµ·å§‹å’Œç»“æŸItemNo </summary>
+    /// <param name="AFirstItemNo1">æŒ‡å®š</param>
+    /// <param name="AFirstItemNo">èµ·å§‹</param>
+    /// <param name="ALastItemNo">ç»“æŸ</param>
+    procedure GetParaItemRang(const AItemNo: Integer; var AFirstItemNo, ALastItemNo: Integer);
     function GetParaFirstItemNo(const AItemNo: Integer): Integer;
     function GetParaLastItemNo(const AItemNo: Integer): Integer;
-    /// <summary> È¡ĞĞµÚÒ»¸öDrawItem¶ÔÓ¦µÄItemNo(ÓÃÓÚ¸ñÊ½»¯Ê±¼ÆËãÒ»¸ö½ÏĞ¡µÄItemNo·¶Î§) </summary>
-    function GetLineFirstItemNo(const AItemNo, AOffset: Integer): Integer;
-    /// <summary> È¡ĞĞ×îºóÒ»¸öDrawItem¶ÔÓ¦µÄItemNo(ÓÃÓÚ¸ñÊ½»¯Ê±¼ÆËãÒ»¸ö½ÏĞ¡µÄItemNo·¶Î§) </summary>
+
+    /// <summary> å–è¡Œç¬¬ä¸€ä¸ªDrawItemå¯¹åº”çš„ItemNo(ç”¨äºæ ¼å¼åŒ–æ—¶è®¡ç®—ä¸€ä¸ªè¾ƒå°çš„ItemNoèŒƒå›´) </summary>
+    function GetLineFirstDrawItemNo(const AItemNo, AOffset: Integer): Integer;
+
+    /// <summary> å–è¡Œæœ€åä¸€ä¸ªDrawItemå¯¹åº”çš„ItemNo(ç”¨äºæ ¼å¼åŒ–æ—¶è®¡ç®—ä¸€ä¸ªè¾ƒå°çš„ItemNoèŒƒå›´) </summary>
     function GetLineLastItemNo(const AItemNo, AOffset: Integer): Integer;
 
-    /// <summary>
-    /// ¸ù¾İÖ¸¶¨Item»ñÈ¡ÆäËùÔÚĞĞµÄÆğÊ¼ºÍ½áÊøDrawItemNo
-    /// </summary>
-    /// <param name="AFirstItemNo1">Ö¸¶¨</param>
-    /// <param name="AFirstItemNo">ÆğÊ¼</param>
-    /// <param name="ALastItemNo">½áÊø</param>
-    procedure GetLineDrawItemRang(var AFirstDItemNo, ALastDItemNo: Integer); virtual;
+    /// <summary> æ ¹æ®æŒ‡å®šItemè·å–å…¶æ‰€åœ¨è¡Œçš„èµ·å§‹å’Œç»“æŸDrawItemNo </summary>
+    /// <param name="AFirstItemNo1">æŒ‡å®š</param>
+    /// <param name="AFirstItemNo">èµ·å§‹</param>
+    /// <param name="ALastItemNo">ç»“æŸ</param>
+    procedure GetLineDrawItemRang(var AFirstDrawItemNo, ALastDrawItemNo: Integer); virtual;
 
-    /// <summary>
-    /// »ñÈ¡Ö¸¶¨DItem¶ÔÓ¦µÄText
-    /// </summary>
+    /// <summary> è·å–æŒ‡å®šDrawItemå¯¹åº”çš„Text </summary>
     /// <param name="ADrawItemNo"></param>
     /// <returns></returns>
     function GetDrawItemText(const ADrawItemNo: Integer): string;
 
-    procedure DoDrawItemPaintBefor(const AData: THCCustomData; const ADrawItemIndex: Integer;
+    /// <summary> è¿”å›å­—ç¬¦ä¸²ATextçš„åˆ†æ•£åˆ†éš”æ•°é‡å’Œå„åˆ†éš”çš„èµ·å§‹ä½ç½® </summary>
+    /// <param name="AText">è¦è®¡ç®—çš„å­—ç¬¦ä¸²</param>
+    /// <param name="ACharIndexs">è®°å½•å„åˆ†éš”çš„èµ·å§‹ä½ç½®</param>
+    /// <returns>åˆ†æ•£åˆ†éš”æ•°é‡</returns>
+    function GetJustifyCount(const AText: string; const ACharIndexs: THCIntegerList): Integer;
+
+    procedure SetCaretDrawItemNo(const Value: Integer);
+
+    /// <summary> è®¡ç®—è¡Œé«˜(æ–‡æœ¬é«˜+è¡Œé—´è·) </summary>
+    function CalculateLineHeight(const ACanvas: TCanvas;
+      const ATextStyle: THCTextStyle; const ALineSpaceMode: TParaLineSpaceMode): Cardinal;
+    function GetUndoList: THCUndoList;
+    procedure DoItemAction(const AItemNo, AOffset: Integer; const AAction: THCItemAction); virtual;
+    procedure DoDrawItemPaintBefor(const AData: THCCustomData; const ADrawItemNo: Integer;
       const ADrawRect: TRect; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
       ADataScreenBottom: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo); virtual;
-    procedure DoDrawItemPaintAfter(const AData: THCCustomData; const ADrawItemIndex: Integer;
+    procedure DoDrawItemPaintContent(const AData: THCCustomData; const ADrawItemNo: Integer;
+      const ADrawRect, AClearRect: TRect; const ADrawText: string; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
+      ADataScreenBottom: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo); virtual;
+    procedure DoDrawItemPaintAfter(const AData: THCCustomData; const ADrawItemNo: Integer;
       const ADrawRect: TRect; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
       ADataScreenBottom: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo); virtual;
   public
     constructor Create(const AStyle: THCStyle); virtual;
     destructor Destroy; override;
-    //
-    function IsEmpty: Boolean;
-    procedure Clear; virtual;
 
     /// <summary>
-    /// µ±Ç°DataÊÇ²»ÊÇÎŞÄÚÈİ(½öÓĞÒ»¸öItemÇÒÄÚÈİÎª¿Õ)
+    /// å½“å‰Dataæ˜¯ä¸æ˜¯æ— å†…å®¹(ä»…æœ‰ä¸€ä¸ªItemä¸”å†…å®¹ä¸ºç©º)
     /// </summary>
     /// <returns></returns>
-    function EmptyData: Boolean;
+    function IsEmptyData: Boolean;
 
+    procedure Clear; virtual;
+
+    procedure InitializeField; virtual;
+
+    /// <summary> åµŒå¥—æ—¶è·å–æ ¹çº§Data </summary>
+    function GetRootData: THCCustomData; virtual;
+
+    /// <summary> å°†æŒ‡å®šçš„åæ ‡è½¬æ¢ä¸ºå±å¹•åæ ‡ </summary>
+    function GetScreenCoord(const X, Y: Integer): TPoint; virtual;
     function CreateDefaultTextItem: THCCustomItem; virtual;
     function CreateDefaultDomainItem: THCCustomItem; virtual;
-    procedure GetCaretInfo(const AItemNo, AOffset: Integer; var ACaretInfo: TCaretInfo); virtual;
+    procedure GetCaretInfo(const AItemNo, AOffset: Integer; var ACaretInfo: THCCaretInfo); virtual;
+
+    /// <summary> è·å–DItemä¸­æŒ‡å®šåç§»å¤„çš„å†…å®¹ç»˜åˆ¶å®½åº¦ </summary>
+    /// <param name="ADrawItemNo"></param>
+    /// <param name="ADrawOffs">ç›¸å¯¹ä¸DItemçš„CharOffsçš„Offs</param>
+    /// <returns></returns>
+    function GetDrawItemOffsetWidth(const ADrawItemNo, ADrawOffs: Integer;
+      const AStyleCanvas: TCanvas = nil): Integer;
+
+    /// <summary> è·å–æŒ‡å®šçš„Itemæœ€åé¢ä½ç½® </summary>
+    /// <param name="AItemNo">æŒ‡å®šçš„Item</param>
+    /// <returns>æœ€åé¢ä½ç½®</returns>
+    function GetItemOffsetAfter(const AItemNo: Integer): Integer;
 
     /// <summary>
-    /// ¸ù¾İ¸ø¶¨µÄÎ»ÖÃ»ñÈ¡ÔÚ´Ë·¶Î§ÄÚµÄÆğÊ¼ºÍ½áÊøDItem
+    /// æ ¹æ®ç»™å®šçš„ä½ç½®è·å–åœ¨æ­¤èŒƒå›´å†…çš„èµ·å§‹å’Œç»“æŸDItem
     /// </summary>
     /// <param name="ATop"></param>
     /// <param name="ABottom"></param>
@@ -147,50 +162,45 @@ type
       var AFirstDItemNo, ALastDItemNo: Integer);
 
     /// <summary>
-    /// ·µ»ØÖ¸¶¨×ø±êÏÂµÄItemºÍOffset
+    /// è¿”å›æŒ‡å®šåæ ‡ä¸‹çš„Itemå’ŒOffset
     /// </summary>
-    /// <param name="X">Ë®Æ½×ø±êÖµX</param>
-    /// <param name="Y">´¹Ö±×ø±êÖµY</param>
-    /// <param name="AItemNo">×ø±ê´¦µÄItem</param>
-    /// <param name="AOffset">×ø±êÔÚItemÖĞµÄÎ»ÖÃ</param>
-    /// <param name="ARestrain">True²¢²»ÊÇÔÚAItemNo·¶Î§ÄÚ(ÔÚĞĞ×îÓÒ²à»ò×îºóÒ»ĞĞµ×²¿£¬Í¨¹ıÔ¼Êø×ø±êÕÒµ½µÄ)</param>
+    /// <param name="X">æ°´å¹³åæ ‡å€¼X</param>
+    /// <param name="Y">å‚ç›´åæ ‡å€¼Y</param>
+    /// <param name="AItemNo">åæ ‡å¤„çš„Item</param>
+    /// <param name="AOffset">åæ ‡åœ¨Itemä¸­çš„ä½ç½®</param>
+    /// <param name="ARestrain">Trueå¹¶ä¸æ˜¯åœ¨AItemNoèŒƒå›´å†…(åœ¨è¡Œæœ€å³ä¾§æˆ–æœ€åä¸€è¡Œåº•éƒ¨ï¼Œé€šè¿‡çº¦æŸåæ ‡æ‰¾åˆ°çš„)</param>
     procedure GetItemAt(const X, Y: Integer; var AItemNo, AOffset, ADrawItemNo: Integer;
-      var ARestrain: Boolean);
-
-    /// <summary>
-    /// »ñÈ¡Ö¸¶¨Item¸ñÊ½»¯Ê±ÆğÊ¼Item
-    /// </summary>
-    /// <param name="AItemNo"></param>
-    /// <returns></returns>
-    //function GetFormatStartItemNo(const AItemNo: Integer): Integer;
+      var ARestrain: Boolean); virtual;
 
     {procedure GetParaDrawItemRang(const AItemNo: Integer;
       var AFirstDItemNo, ALastDItemNo: Integer);}
 
-    { ItemºÍDItem»¥²é }
+    { Itemå’ŒDItemäº’æŸ¥ }
     /// <summary>
-    /// »ñÈ¡Item¶ÔÓ¦µÄ×îºóÒ»¸öDItem
+    /// è·å–Itemå¯¹åº”çš„æœ€åä¸€ä¸ªDItem
     /// </summary>
     /// <param name="AItemNo"></param>
     /// <returns></returns>
     function GetItemLastDrawItemNo(const AItemNo: Integer): Integer;
 
     /// <summary>
-    /// ItemÖ¸¶¨Æ«ÒÆÎ»ÖÃÊÇ·ñ±»Ñ¡ÖĞ(½öÓÃÓÚÎÄ±¾ItemºÍ´ÖÂÔRect)
+    /// ItemæŒ‡å®šåç§»ä½ç½®æ˜¯å¦è¢«é€‰ä¸­(ä»…ç”¨äºæ–‡æœ¬Itemå’Œç²—ç•¥Rect)
     /// </summary>
     /// <param name="AItemNo"></param>
     /// <param name="AOffset"></param>
     /// <returns></returns>
     function OffsetInSelect(const AItemNo, AOffset: Integer): Boolean;
 
-    /// <summary> ×ø±êÊÇ·ñÔÚAItemµÄÑ¡ÖĞÇøÓòÖĞ </summary>
+    /// <summary> åæ ‡æ˜¯å¦åœ¨AItemçš„é€‰ä¸­åŒºåŸŸä¸­ </summary>
     /// <param name="X"></param>
     /// <param name="Y"></param>
-    /// <param name="AItemNo">X¡¢Y´¦µÄItem</param>
-    /// <param name="AOffset">X¡¢Y´¦µÄItemÆ«ÒÆ(¹©ÔÚRectItemÉÏÊ±¼ÆËã)</param>
-    function CoordInSelect(const X, Y, AItemNo, AOffset: Integer): Boolean;
+    /// <param name="AItemNo">Xã€Yå¤„çš„Item</param>
+    /// <param name="AOffset">Xã€Yå¤„çš„Itemåç§»(ä¾›åœ¨RectItemä¸Šæ—¶è®¡ç®—)</param>
+    /// <param name="ARestrain">AItemNo, AOffsetæ˜¯Xã€Yä½ç½®çº¦æŸåçš„(æ­¤å‚æ•°ä¸ºæ–¹ä¾¿å•å…ƒæ ¼Dataå¤„ç†)</param>
+    function CoordInSelect(const X, Y, AItemNo, AOffset: Integer;
+      const ARestrain: Boolean): Boolean; virtual;
     /// <summary>
-    /// »ñÈ¡DataÖĞµÄ×ø±êX¡¢Y´¦µÄItemºÍOffset£¬²¢·µ»ØX¡¢YÏà¶ÔDrawItemµÄ×ø±ê
+    /// è·å–Dataä¸­çš„åæ ‡Xã€Yå¤„çš„Itemå’ŒOffsetï¼Œå¹¶è¿”å›Xã€Yç›¸å¯¹DrawItemçš„åæ ‡
     /// </summary>
     /// <param name="X"></param>
     /// <param name="Y"></param>
@@ -200,12 +210,10 @@ type
     /// <param name="AY"></param>
     procedure CoordToItemOffset(const X, Y, AItemNo, AOffset: Integer; var AX, AY: Integer);
 
-    /// <summary>
-    /// ·µ»ØItemÖĞÖ¸¶¨Offset´¦µÄDrawItemĞòºÅ
-    /// </summary>
-    /// <param name="AItemNo">Ö¸¶¨Item</param>
-    /// <param name="AOffset">ItemÖĞÖ¸¶¨Offset</param>
-    /// <returns>Offset´¦µÄDrawItemĞòºÅ</returns>
+    /// <summary> è¿”å›Itemä¸­æŒ‡å®šOffsetå¤„çš„DrawItemåºå·ï¼Œå¦‚æ­£æ˜¯æ¢è¡Œä½ç½®ï¼Œè¿”å›çš„æ˜¯ä¸‹ä¸€è¡ŒDrawItem </summary>
+    /// <param name="AItemNo">æŒ‡å®šItem</param>
+    /// <param name="AOffset">Itemä¸­æŒ‡å®šOffset</param>
+    /// <returns>Offsetå¤„çš„DrawItemåºå·</returns>
     function GetDrawItemNoByOffset(const AItemNo, AOffset: Integer): Integer;
     function IsLineLastDrawItem(const ADrawItemNo: Integer): Boolean;
     function IsParaLastDrawItem(const ADrawItemNo: Integer): Boolean;
@@ -216,127 +224,117 @@ type
     function GetCurItemNo: Integer;
     function GetCurItem: THCCustomItem;
 
-    /// <summary>
-    /// ·µ»ØItemµÄÎÄ±¾ÑùÊ½
-    /// </summary>
+    /// <summary> è¿”å›Itemçš„æ–‡æœ¬æ ·å¼ </summary>
     function GetItemStyle(const AItemNo: Integer): Integer;
 
-    /// <summary>
-    /// ·µ»ØDDrawItem¶ÔÓ¦µÄItemµÄÎÄ±¾ÑùÊ½
-    /// </summary>
+    /// <summary> è¿”å›DDrawItemå¯¹åº”çš„Itemçš„æ–‡æœ¬æ ·å¼ </summary>
     function GetDrawItemStyle(const ADrawItemNo: Integer): Integer;
 
-    /// <summary>
-    /// ·µ»ØItem¶ÔÓ¦µÄ¶ÎÂäÑùÊ½
-    /// </summary>
+    /// <summary> è¿”å›Itemå¯¹åº”çš„æ®µè½æ ·å¼ </summary>
     function GetItemParaStyle(const AItemNo: Integer): Integer;
 
-    /// <summary>
-    /// ·µ»ØDDrawItem¶ÔÓ¦µÄItemµÄ¶ÎÂäÑùÊ½
-    /// </summary>
+    /// <summary> è¿”å›DDrawItemå¯¹åº”çš„Itemçš„æ®µè½æ ·å¼ </summary>
     function GetDrawItemParaStyle(const ADrawItemNo: Integer): Integer;
 
-    /// <summary>
-    /// µÃµ½Ö¸¶¨ºá×ø±êX´¦£¬ÊÇDItemÄÚÈİµÄµÚ¼¸¸ö×Ö·û
-    /// </summary>
-    /// <param name="ADrawItemNo">Ö¸¶¨µÄDItem</param>
-    /// <param name="X">ÔÚDataÖĞµÄºá×ø±ê</param>
-    /// <returns>µÚ¼¸¸ö×Ö·û</returns>
-    function GetDrawItemOffset(const ADrawItemNo, X: Integer): Integer;
+    /// <summary> å¾—åˆ°æŒ‡å®šæ¨ªåæ ‡Xå¤„ï¼Œæ˜¯DItemå†…å®¹çš„ç¬¬å‡ ä¸ªå­—ç¬¦ </summary>
+    /// <param name="ADrawItemNo">æŒ‡å®šçš„DItem</param>
+    /// <param name="X">åœ¨Dataä¸­çš„æ¨ªåæ ‡</param>
+    /// <returns>ç¬¬å‡ ä¸ªå­—ç¬¦</returns>
+    function GetDrawItemOffsetAt(const ADrawItemNo, X: Integer): Integer;
 
-    { »ñÈ¡Ñ¡ÖĞÏà¹ØĞÅÏ¢ }
-    /// <summary>
-    /// µ±Ç°Ñ¡ÖĞÆğÊ¼DItemNo
-    /// </summary>
+    { è·å–é€‰ä¸­ç›¸å…³ä¿¡æ¯ }
+    /// <summary> å½“å‰é€‰ä¸­èµ·å§‹DItemNo </summary>
     /// <returns></returns>
     function GetSelectStartDrawItemNo: Integer;
 
-    /// <summary>
-    /// µ±Ç°Ñ¡ÖĞ½áÊøDItemNo
-    /// </summary>
+    /// <summary> å½“å‰é€‰ä¸­ç»“æŸDItemNo </summary>
     /// <returns></returns>
     function GetSelectEndDrawItemNo: Integer;
 
-    /// <summary>
-    /// »ñÈ¡Ñ¡ÖĞÄÚÈİÊÇ·ñÔÚÍ¬Ò»¸öDItemÖĞ
-    /// </summary>
+    /// <summary> è·å–é€‰ä¸­å†…å®¹æ˜¯å¦åœ¨åŒä¸€ä¸ªDItemä¸­ </summary>
     /// <returns></returns>
     function SelectInSameDItem: Boolean;
 
-    /// <summary> È¡ÏûÑ¡ÖĞ </summary>
-    /// <returns>È¡ÏûÊ±µ±Ç°ÃæÊÇ·ñÓĞÑ¡ÖĞ£¬True£ºÓĞÑ¡ÖĞ£»False£ºÎŞÑ¡ÖĞ</returns>
+    /// <summary> å–æ¶ˆé€‰ä¸­ </summary>
+    /// <returns>å–æ¶ˆæ—¶å½“å‰æ˜¯å¦æœ‰é€‰ä¸­ï¼ŒTrueï¼šæœ‰é€‰ä¸­ï¼›Falseï¼šæ— é€‰ä¸­</returns>
     function DisSelect: Boolean; virtual;
 
-    /// <summary>
-    /// µ±Ç°Ñ¡ÖĞÄÚÈİÔÊĞíÍÏ¶¯
-    /// </summary>
+    /// <summary> å½“å‰é€‰ä¸­å†…å®¹å…è®¸æ‹–åŠ¨ </summary>
     /// <returns></returns>
     function SelectedCanDrag: Boolean;
 
-    /// <summary>
-    /// µ±Ç°Ñ¡ÖĞÄÚÈİÖ»ÓĞRectItemÇÒÕı´¦ÓÚËõ·Å×´Ì¬
-    /// </summary>
+    /// <summary> å½“å‰é€‰ä¸­å†…å®¹åªæœ‰RectItemä¸”æ­£å¤„äºç¼©æ”¾çŠ¶æ€ </summary>
     /// <returns></returns>
     function SelectedResizing: Boolean;
 
-    /// <summary>
-    /// È«Ñ¡
-    /// </summary>
-    procedure SelectAll;
+    /// <summary> å…¨é€‰ </summary>
+    procedure SelectAll; virtual;
 
-    /// <summary>
-    /// µ±Ç°ÄÚÈİÈ«Ñ¡ÖĞÁË
-    /// </summary>
-    /// <returns></returns>
-    function SelectedAll: Boolean;
+    /// <summary> å½“å‰å†…å®¹æ˜¯å¦å…¨é€‰ä¸­äº† </summary>
+    function SelectedAll: Boolean; virtual;
 
-    /// <summary>
-    /// Îª¶ÎÓ¦ÓÃ¶ÔÆë·½Ê½
-    /// </summary>
-    /// <param name="AAlign">¶Ô·½·½Ê½</param>
+    /// <summary> ä¸ºæ®µåº”ç”¨å¯¹é½æ–¹å¼ </summary>
+    /// <param name="AAlign">å¯¹æ–¹æ–¹å¼</param>
     procedure ApplyParaAlignHorz(const AAlign: TParaAlignHorz); virtual;
     procedure ApplyParaAlignVert(const AAlign: TParaAlignVert); virtual;
     procedure ApplyParaBackColor(const AColor: TColor); virtual;
-    procedure ApplyParaLineSpace(const ASpace: Integer); virtual;
+    procedure ApplyParaLineSpace(const ASpaceMode: TParaLineSpaceMode); virtual;
+    procedure ApplyParaLeftIndent(const AIndent: Single); virtual;
+    procedure ApplyParaRightIndent(const AIndent: Single); virtual;
+    procedure ApplyParaFirstIndent(const AIndent: Single); virtual;
 
-    // Ñ¡ÖĞÄÚÈİÓ¦ÓÃÑùÊ½
-    function ApplySelectTextStyle(const AMatchStyle: TStyleMatch): Integer; virtual;
-    function ApplySelectParaStyle(const AMatchStyle: TParaMatch): Integer; virtual;
+    // é€‰ä¸­å†…å®¹åº”ç”¨æ ·å¼
+    procedure ApplySelectTextStyle(const AMatchStyle: THCStyleMatch); virtual;
+    procedure ApplySelectParaStyle(const AMatchStyle: THCParaMatch); virtual;
 
-    /// <summary> É¾³ıÑ¡ÖĞ </summary>
+    /// <summary> åˆ é™¤é€‰ä¸­ </summary>
     function DeleteSelected: Boolean; virtual;
 
-    /// <summary>
-    /// ÎªÑ¡ÖĞÎÄ±¾Ê¹ÓÃÖ¸¶¨µÄÎÄ±¾ÑùÊ½
-    /// </summary>
-    /// <param name="AFontStyle">ÎÄ±¾ÑùÊ½</param>
-    procedure ApplyTextStyle(const AFontStyle: TFontStyleEx); virtual;
+    /// <summary> ä¸ºé€‰ä¸­æ–‡æœ¬ä½¿ç”¨æŒ‡å®šçš„æ–‡æœ¬æ ·å¼ </summary>
+    /// <param name="AFontStyle">æ–‡æœ¬æ ·å¼</param>
+    procedure ApplyTextStyle(const AFontStyle: THCFontStyle); virtual;
     procedure ApplyTextFontName(const AFontName: TFontName); virtual;
-    procedure ApplyTextFontSize(const AFontSize: Integer); virtual;
+    procedure ApplyTextFontSize(const AFontSize: Single); virtual;
     procedure ApplyTextColor(const AColor: TColor); virtual;
     procedure ApplyTextBackColor(const AColor: TColor); virtual;
 
-    /// <summary>
-    /// »æÖÆÊı¾İ
-    /// </summary>
-    /// <param name="ADataDrawLeft">»æÖÆÄ¿±êÇøÓòLeft</param>
-    /// <param name="ADataDrawTop">»æÖÆÄ¿±êÇøÓòµÄTop</param>
-    /// <param name="ADataDrawBottom">»æÖÆÄ¿±êÇøÓòµÄBottom</param>
-    /// <param name="ADataScreenTop">ÆÁÄ»ÇøÓòTop</param>
-    /// <param name="ADataScreenBottom">ÆÁÄ»ÇøÓòBottom</param>
-    /// <param name="AVOffset">Ö¸¶¨´ÓÄÄ¸öÎ»ÖÃ¿ªÊ¼µÄÊı¾İ»æÖÆµ½Ä¿±êÇøÓòµÄÆğÊ¼Î»ÖÃ</param>
-    /// <param name="ACanvas">»­²¼</param>
+    /// <summary> ç»˜åˆ¶æ•°æ® </summary>
+    /// <param name="ADataDrawLeft">ç»˜åˆ¶ç›®æ ‡åŒºåŸŸLeft</param>
+    /// <param name="ADataDrawTop">ç»˜åˆ¶ç›®æ ‡åŒºåŸŸçš„Top</param>
+    /// <param name="ADataDrawBottom">ç»˜åˆ¶ç›®æ ‡åŒºåŸŸçš„Bottom</param>
+    /// <param name="ADataScreenTop">å±å¹•åŒºåŸŸTop</param>
+    /// <param name="ADataScreenBottom">å±å¹•åŒºåŸŸBottom</param>
+    /// <param name="AVOffset">æŒ‡å®šä»å“ªä¸ªä½ç½®å¼€å§‹çš„æ•°æ®ç»˜åˆ¶åˆ°ç›®æ ‡åŒºåŸŸçš„èµ·å§‹ä½ç½®</param>
+    /// <param name="AFristDItemNo">æŒ‡å®šä»å“ªä¸ªDrawItemå¼€å§‹ç»˜åˆ¶</param>
+    /// <param name="ALastDItemNo">æŒ‡å®šç»˜åˆ¶åˆ°å“ªä¸ªDrawItemç»“æŸ</param>
+    /// <param name="ACanvas">ç”»å¸ƒ</param>
+    procedure PaintData(const ADataDrawLeft, ADataDrawTop, ADataDrawBottom,
+      ADataScreenTop, ADataScreenBottom, AVOffset, AFristDItemNo, ALastDItemNo: Integer;
+      const ACanvas: TCanvas; const APaintInfo: TPaintInfo); overload; virtual;
+
+    /// <summary> ç»˜åˆ¶æ•°æ® </summary>
+    /// <param name="ADataDrawLeft">ç»˜åˆ¶ç›®æ ‡åŒºåŸŸLeft</param>
+    /// <param name="ADataDrawTop">ç»˜åˆ¶ç›®æ ‡åŒºåŸŸçš„Top</param>
+    /// <param name="ADataDrawBottom">ç»˜åˆ¶ç›®æ ‡åŒºåŸŸçš„Bottom</param>
+    /// <param name="ADataScreenTop">å±å¹•åŒºåŸŸTop</param>
+    /// <param name="ADataScreenBottom">å±å¹•åŒºåŸŸBottom</param>
+    /// <param name="AVOffset">æŒ‡å®šä»å“ªä¸ªä½ç½®å¼€å§‹çš„æ•°æ®ç»˜åˆ¶åˆ°ç›®æ ‡åŒºåŸŸçš„èµ·å§‹ä½ç½®</param>
+    /// <param name="ACanvas">ç”»å¸ƒ</param>
     procedure PaintData(const ADataDrawLeft, ADataDrawTop, ADataDrawBottom,
       ADataScreenTop, ADataScreenBottom, AVOffset: Integer;
-      const ACanvas: TCanvas; const APaintInfo: TPaintInfo); virtual;
+      const ACanvas: TCanvas; const APaintInfo: TPaintInfo); overload; virtual;
 
-    /// <summary>
-    /// Ìí¼ÓDataµ½µ±Ç°
-    /// </summary>
-    /// <param name="ASrcData">Ô´Data</param>
-    procedure AddData(const ASrcData: THCCustomData);
+    /// <summary> æ ¹æ®è¡Œä¸­æŸDrawItemè·å–å½“å‰è¡Œé—´è·(è¡Œä¸­é™¤æ–‡æœ¬å¤–çš„ç©ºç™½ç©ºé—´) </summary>
+    /// <param name="ADrawNo">è¡Œä¸­æŒ‡å®šçš„DrawItem</param>
+    /// <returns>è¡Œé—´è·</returns>
+    function GetLineBlankSpace(const ADrawNo: Integer): Integer;
 
-    /// <summary> ÊÇ·ñÓĞÑ¡ÖĞ </summary>
+    /// <summary> è·å–æŒ‡å®šDrawItemçš„è¡Œé—´è· </summary>
+    /// <param name="ADrawNo">æŒ‡å®šçš„DrawItem</param>
+    /// <returns>DrawItemçš„è¡Œé—´è·</returns>
+    function GetDrawItemLineSpace(const ADrawNo: Integer): Integer;
+
+    /// <summary> æ˜¯å¦æœ‰é€‰ä¸­ </summary>
     function SelectExists(const AIfRectItem: Boolean = True): Boolean;
     procedure MarkStyleUsed(const AMark: Boolean);
 
@@ -348,80 +346,50 @@ type
     function SaveToText(const AStartItemNo, AStartOffset,
       AEndItemNo, AEndOffset: Integer): string; overload;
 
-    /// <summary> ±£´æÑ¡ÖĞÄÚÈİµ½Á÷ </summary>
+    /// <summary> ä¿å­˜é€‰ä¸­å†…å®¹åˆ°æµ </summary>
     procedure SaveSelectToStream(const AStream: TStream); virtual;
     function SaveSelectToText: string;
     function InsertStream(const AStream: TStream; const AStyle: THCStyle;
       const AFileVersion: Word): Boolean; virtual;
     procedure LoadFromStream(const AStream: TStream; const AStyle: THCStyle;
       const AFileVersion: Word); virtual;
+
+    function ToHtml(const APath: string): string;
+    procedure ToXml(const ANode: IHCXMLNode); virtual;
+    procedure ParseXml(const ANode: IHCXMLNode); virtual;
     //
     property Style: THCStyle read FStyle;
+    property CurStyleNo: Integer read FCurStyleNo write SetCurStyleNo;
+    property CurParaNo: Integer read FCurParaNo write SetCurParaNo;
     property Items: THCItems read FItems;
     property DrawItems: THCDrawItems read FDrawItems;
     property SelectInfo: TSelectInfo read FSelectInfo;
     property DrawOptions: TDrawOptions read FDrawOptions write FDrawOptions;
-    property CaretDrawItemNo: Integer read FCaretDrawItemNo write FCaretDrawItemNo;
+    property CaretDrawItemNo: Integer read FCaretDrawItemNo write SetCaretDrawItemNo;
+    property OnGetUndoList: TGetUndoListEvent read FOnGetUndoList write FOnGetUndoList;
+    property OnCurParaNoChange: TNotifyEvent read FOnCurParaNoChange write FOnCurParaNoChange;
+  end;
+
+type
+  TTraverseItemEvent = procedure(const AData: THCCustomData;
+    const AItemNo, ATag: Integer; var AStop: Boolean) of object;
+
+  TItemTraverse = class(TObject)
+  public
+    Areas: TSectionAreas;
+    Tag: Integer;
+    Stop: Boolean;
+    Process: TTraverseItemEvent;
   end;
 
 implementation
 
+{$I HCView.inc}
+
 uses
-  SysUtils, Math, HCList, HCTextItem, HCRectItem;
+  SysUtils, Math, HCTextItem, HCRectItem, HCUnitConversion;
 
 { THCCustomData }
-
-/// <summary>
-/// ·µ»Ø×Ö·û´®ATextµÄ·ÖÉ¢·Ö¸ôÊıÁ¿ºÍ¸÷·Ö¸ôµÄÆğÊ¼Î»ÖÃ
-/// </summary>
-/// <param name="AText">Òª¼ÆËãµÄ×Ö·û´®</param>
-/// <param name="ACharIndexs">¼ÇÂ¼¸÷·Ö¸ôµÄÆğÊ¼Î»ÖÃ</param>
-/// <returns>·ÖÉ¢·Ö¸ôÊıÁ¿</returns>
-function GetJustifyCount(const AText: string; const ACharIndexs: THCList): Integer;
-
-  function IsCharSameType(const A, B: Char): Boolean;
-  begin
-    //if A = B then
-    //  Result := True
-    //else
-      Result := False;
-  end;
-
-var
-  i: Integer;
-  vProvChar: Char;
-begin
-  Result := 0;
-  if AText = '' then
-    raise Exception.Create('Òì³££º²»ÄÜ¶Ô¿Õ×Ö·û´®¼ÆËã·ÖÉ¢£¡');
-
-  if ACharIndexs <> nil then
-    ACharIndexs.Clear;
-  vProvChar := #0;
-  for i := 1 to Length(AText) do
-  begin
-    if not IsCharSameType(vProvChar, AText[i]) then
-    begin
-      Inc(Result);
-      if ACharIndexs <> nil then
-        ACharIndexs.Add(i);
-    end;
-    vProvChar := AText[i];
-  end;
-  if ACharIndexs <> nil then
-    ACharIndexs.Add(Length(AText) + 1);
-end;
-
-procedure THCCustomData.AddData(const ASrcData: THCCustomData);
-var
-  i: Integer;
-begin
-  for i := 0 to ASrcData.FItems.Count - 1 do
-  begin
-    FItems[FItems.Count - 1].Text := FItems[FItems.Count - 1].Text
-      + ASrcData.FItems[i].Text;
-  end;
-end;
 
 procedure THCCustomData.ApplyTextBackColor(const AColor: TColor);
 var
@@ -462,7 +430,7 @@ begin
   end;
 end;
 
-procedure THCCustomData.ApplyTextFontSize(const AFontSize: Integer);
+procedure THCCustomData.ApplyTextFontSize(const AFontSize: Single);
 var
   vMatchStyle: TFontSizeStyleMatch;
 begin
@@ -475,7 +443,7 @@ begin
   end;
 end;
 
-procedure THCCustomData.ApplyTextStyle(const AFontStyle: TFontStyleEx);
+procedure THCCustomData.ApplyTextStyle(const AFontStyle: THCFontStyle);
 var
   vMatchStyle: TTextStyleMatch;
 begin
@@ -527,59 +495,104 @@ begin
   end;
 end;
 
-procedure THCCustomData.ApplyParaLineSpace(const ASpace: Integer);
+procedure THCCustomData.ApplyParaFirstIndent(const AIndent: Single);
 var
-  vMatchStyle: TParaLineSpaceMatch;
+  vMatchStyle: TParaFirstIndentMatch;
 begin
-  vMatchStyle := TParaLineSpaceMatch.Create;
+  vMatchStyle := TParaFirstIndentMatch.Create;
   try
-    vMatchStyle.Space := ASpace;
+    vMatchStyle.Indent := AIndent;
     ApplySelectParaStyle(vMatchStyle);
   finally
     vMatchStyle.Free;
   end;
 end;
 
-function THCCustomData.ApplySelectParaStyle(const AMatchStyle: TParaMatch): Integer;
+procedure THCCustomData.ApplyParaLeftIndent(const AIndent: Single);
+var
+  vMatchStyle: TParaLeftIndentMatch;
 begin
+  vMatchStyle := TParaLeftIndentMatch.Create;
+  try
+    vMatchStyle.Indent := AIndent;
+    ApplySelectParaStyle(vMatchStyle);
+  finally
+    vMatchStyle.Free;
+  end;
 end;
 
-function THCCustomData.ApplySelectTextStyle(const AMatchStyle: TStyleMatch): Integer;
+procedure THCCustomData.ApplyParaLineSpace(const ASpaceMode: TParaLineSpaceMode);
+var
+  vMatchStyle: TParaLineSpaceMatch;
 begin
+  vMatchStyle := TParaLineSpaceMatch.Create;
+  try
+    vMatchStyle.SpaceMode := ASpaceMode;
+    ApplySelectParaStyle(vMatchStyle);
+  finally
+    vMatchStyle.Free;
+  end;
+end;
+
+procedure THCCustomData.ApplyParaRightIndent(const AIndent: Single);
+var
+  vMatchStyle: TParaRightIndentMatch;
+begin
+  vMatchStyle := TParaRightIndentMatch.Create;
+  try
+    vMatchStyle.Indent := AIndent;
+    ApplySelectParaStyle(vMatchStyle);
+  finally
+    vMatchStyle.Free;
+  end;
+end;
+
+procedure THCCustomData.ApplySelectParaStyle(const AMatchStyle: THCParaMatch);
+begin
+  // å› ä¸ºè¦å¤„ç†æ’¤é”€æ¢å¤ï¼Œæ‰€ä»¥ä¸åœ¨è¿™é‡Œå®ç°
+end;
+
+procedure THCCustomData.ApplySelectTextStyle(const AMatchStyle: THCStyleMatch);
+begin
+  // å› ä¸ºè¦å¤„ç†æ’¤é”€æ¢å¤ï¼Œæ‰€ä»¥ä¸åœ¨è¿™é‡Œå®ç°
 end;
 
 procedure THCCustomData.Clear;
 begin
-  //DisSelect;  ÓÃ²»×ÅDisSelect°É
+  //DisSelect;  ç”¨ä¸ç€DisSelectå§
   FSelectInfo.Initialize;
+  FCaretDrawItemNo := -1;
   FDrawItems.Clear;
   FItems.Clear;
+  FCurStyleNo := 0;
+  FCurParaNo := 0;
 end;
 
 function THCCustomData.CoordInSelect(const X, Y, AItemNo,
-  AOffset: Integer): Boolean;
+  AOffset: Integer; const ARestrain: Boolean): Boolean;
 var
   vX, vY, vDrawItemNo: Integer;
   vDrawRect: TRect;
 begin
   Result := False;
   if (AItemNo < 0) or (AOffset < 0) then Exit;
+  if ARestrain then Exit;
 
-  // ÅĞ¶Ï×ø±êÊÇ·ñÔÚAItemNo¶ÔÓ¦µÄAOffsetÉÏ
+  // åˆ¤æ–­åæ ‡æ˜¯å¦åœ¨AItemNoå¯¹åº”çš„AOffsetä¸Š
   vDrawItemNo := GetDrawItemNoByOffset(AItemNo, AOffset);
   vDrawRect := DrawItems[vDrawItemNo].Rect;
   Result := PtInRect(vDrawRect, Point(X, Y));
-  if Result then  // ÔÚ¶ÔÓ¦µÄDrawItemÉÏ
+  if Result then  // åœ¨å¯¹åº”çš„DrawItemä¸Š
   begin
-    if FItems[AItemNo].StyleNo < THCStyle.RsNull then
+    if FItems[AItemNo].StyleNo < THCStyle.Null then
     begin
       vX := X - vDrawRect.Left;
-      vY := Y - vDrawRect.Top - FStyle.ParaStyles[Items[AItemNo].ParaNo].LineSpaceHalf;
+      vY := Y - vDrawRect.Top - GetLineBlankSpace(vDrawItemNo) div 2;
 
-      Result := (FItems[AItemNo] as THCCustomRectItem).CoordInSelect(vX, vY)
+      Result := (FItems[AItemNo] as THCCustomRectItem).CoordInSelect(vX, vY);
     end
     else
-      Result := OffsetInSelect(AItemNo, AOffset);  // ¶ÔÓ¦µÄAOffsetÔÚÑ¡ÖĞÄÚÈİÖĞ
+      Result := OffsetInSelect(AItemNo, AOffset);  // å¯¹åº”çš„AOffsetåœ¨é€‰ä¸­å†…å®¹ä¸­
   end;
 end;
 
@@ -595,10 +608,21 @@ begin
 
   vDrawItemNo := GetDrawItemNoByOffset(AItemNo, AOffset);
   vDrawRect := FDrawItems[vDrawItemNo].Rect;
+
+  InflateRect(vDrawRect, 0, -GetLineBlankSpace(vDrawItemNo) div 2);
+
   AX := AX - vDrawRect.Left;
   AY := AY - vDrawRect.Top;
-  if FItems[AItemNo].StyleNo < THCStyle.RsNull then
-    AY := AY - FStyle.ParaStyles[Items[AItemNo].ParaNo].LineSpaceHalf;
+  if FItems[AItemNo].StyleNo < THCStyle.Null then
+  begin
+    case FStyle.ParaStyles[FItems[AItemNo].ParaNo].AlignVert of  // å‚ç›´å¯¹é½æ–¹å¼
+      pavCenter: AY := AY - (vDrawRect.Height - (FItems[AItemNo] as THCCustomRectItem).Height) div 2;
+
+      pavTop: ;
+    else
+      AY := AY - (vDrawRect.Height - (FItems[AItemNo] as THCCustomRectItem).Height);
+    end;
+  end;
 end;
 
 constructor THCCustomData.Create(const AStyle: THCStyle);
@@ -606,21 +630,32 @@ begin
   FStyle := AStyle;
   FDrawItems := THCDrawItems.Create;
   FItems := THCItems.Create;
+  FCurStyleNo := 0;
+  FCurParaNo := 0;
   FCaretDrawItemNo := -1;
   FSelectInfo := TSelectInfo.Create;
 end;
 
 function THCCustomData.CreateDefaultDomainItem: THCCustomItem;
 begin
-  Result := THCDomainItem.Create;
-  Result.ParaNo := FStyle.CurParaNo;
+  Result := HCDefaultDomainItemClass.Create(Self);
+  Result.ParaNo := FCurParaNo;
 end;
 
 function THCCustomData.CreateDefaultTextItem: THCCustomItem;
 begin
-  Result := THCTextItem.Create;
-  Result.StyleNo := FStyle.CurStyleNo;
-  Result.ParaNo := FStyle.CurParaNo;
+  Result := HCDefaultTextItemClass.CreateByText('');  // å¿…éœ€æœ‰å‚æ•°å¦åˆ™ä¸èƒ½è°ƒç”¨å±æ€§åˆ›å»º;
+  if FCurStyleNo < THCStyle.Null then
+    Result.StyleNo := 0
+  else
+    Result.StyleNo := FCurStyleNo;
+
+  Result.ParaNo := FCurParaNo;
+end;
+
+function THCCustomData.CreateItemByStyle(const AStyleNo: Integer): THCCustomItem;
+begin
+  Result := nil;
 end;
 
 function THCCustomData.GetCurDrawItem: THCCustomDrawItem;
@@ -637,14 +672,14 @@ end;
 function THCCustomData.GetCurDrawItemNo: Integer;
 var
   i, vItemNo: Integer;
-  vDItem: THCCustomDrawItem;
+  vDrawItem: THCCustomDrawItem;
 begin
   Result := -1;
-  if SelectInfo.StartItemNo < 0 then  // Ã»ÓĞÑ¡Ôñ
+  if SelectInfo.StartItemNo < 0 then  // æ²¡æœ‰é€‰æ‹©
 
   else
   begin
-    if SelectExists then  // ÓĞÑ¡ÖĞÊ±£¬µ±Ç°ÒÔÑ¡ÖĞ½áÊøÎ»ÖÃµÄItemÎªµ±Ç°Item
+    if SelectExists then  // æœ‰é€‰ä¸­æ—¶ï¼Œå½“å‰ä»¥é€‰ä¸­ç»“æŸä½ç½®çš„Itemä¸ºå½“å‰Item
     begin
       if FSelectInfo.EndItemNo >= 0 then
         vItemNo := FSelectInfo.EndItemNo
@@ -653,14 +688,15 @@ begin
     end
     else
       vItemNo := FSelectInfo.StartItemNo;
-    if FItems[vItemNo].StyleNo < 0 then  // ·ÇÎÄ±¾
+
+    if FItems[vItemNo].StyleNo < THCStyle.Null then  // RectItem
       Result := FItems[vItemNo].FirstDItemNo
-    else  // ÎÄ±¾
+    else  // æ–‡æœ¬
     begin
       for i := FItems[vItemNo].FirstDItemNo to FDrawItems.Count - 1 do
       begin
-        vDItem := FDrawItems[i];
-        if SelectInfo.StartItemOffset - vDItem.CharOffs + 1 <= vDItem.CharLen then
+        vDrawItem := FDrawItems[i];
+        if SelectInfo.StartItemOffset - vDrawItem.CharOffs + 1 <= vDrawItem.CharLen then
         begin
           Result := i;
           Break;
@@ -683,10 +719,10 @@ end;
 
 function THCCustomData.GetCurItemNo: Integer;
 begin
-  if IsEmpty then
+  {if IsEmptyData then
     Result := 0
-  else
-    Result := FSelectInfo.StartItemNo
+  else}
+    Result := FSelectInfo.StartItemNo;
 end;
 
 function THCCustomData.DeleteSelected: Boolean;
@@ -707,47 +743,67 @@ var
   i: Integer;
   vItem: THCCustomItem;
 begin
+  { THCCustomRichData.MouseUpçœ‹çš„DisSelectAfterStartItemNoä¸­æœ‰ä¿ç•™èµ·å§‹ä¸æ¸…é€‰ä¸­ï¼Œ
+   å¦‚æœå¤šå¤„éœ€è¦ä¿ç•™èµ·å§‹ï¼Œå¯ä»¥åœ¨æ­¤æ–¹æ³•å¢åŠ æ˜¯å¦ä¿ç•™èµ·å§‹å‚æ•°ä»¥å…±ç”¨ }
+
   Result := SelectExists;
-  if Result then  // ÓĞÑ¡ÖĞÄÚÈİ
+  if Result then  // æœ‰é€‰ä¸­å†…å®¹
   begin
-    // ÏÈ½«µÚ1¸öÈ¡ÏûÑ¡ÖĞ£¬ÕâÑù×ö¿ÉÒÔ½«RectItemµÄÑ¡ÖĞ´¦Àíµô£¬·ñÔòÈç¹ûÔÚRectItemÖĞÓĞÑ¡ÖĞÊ±£¬ÏÂÃævEndNo<0£¬²»ÄÜÑ­»·´¦ÀíÈ¡ÏûÑ¡ÖĞ
+    // å¦‚æœé€‰ä¸­æ˜¯åœ¨RectItemä¸­è¿›ï¼Œä¸‹é¢å¾ªç¯SelectInfo.EndItemNo<0ï¼Œä¸èƒ½å–æ¶ˆé€‰ä¸­ï¼Œæ‰€ä»¥å•ç‹¬å¤„ç†StartItemNo
     vItem := FItems[SelectInfo.StartItemNo];
     vItem.DisSelect;
     vItem.Active := False;
-    {if vItem.StyleNo < THCStyle.RsNull then  // RectItem×Ô¼º´¦ÀíÄÚ²¿µÄÈ¡ÏûÑ¡ÖĞ
-      (vItem as THCCustomRectItem).DisSelect;}
 
-    for i := SelectInfo.StartItemNo + 1 to SelectInfo.EndItemNo do  // ±éÀúÑ¡ÖĞµÄÆäËûItem
+    for i := SelectInfo.StartItemNo + 1 to SelectInfo.EndItemNo do  // éå†é€‰ä¸­çš„å…¶ä»–Item
     begin
       vItem := FItems[i];
       vItem.DisSelect;
       vItem.Active := False;
-      {if vItem.StyleNo < THCStyle.RsNull then  // RectItem×Ô¼º´¦ÀíÄÚ²¿µÄÈ¡ÏûÑ¡ÖĞ
-        (vItem as THCCustomRectItem).DisSelect;}
     end;
     SelectInfo.EndItemNo := -1;
     SelectInfo.EndItemOffset := -1;
+  end
+  else  // æ²¡æœ‰é€‰ä¸­
+  if SelectInfo.StartItemNo >= 0 then
+  begin
+    vItem := FItems[SelectInfo.StartItemNo];
+    vItem.DisSelect;
+    vItem.Active := False;
   end;
+
   SelectInfo.StartItemNo := -1;
   SelectInfo.StartItemOffset := -1;
 end;
 
 procedure THCCustomData.DoDrawItemPaintAfter(const AData: THCCustomData;
-  const ADrawItemIndex: Integer; const ADrawRect: TRect; const ADataDrawLeft,
+  const ADrawItemNo: Integer; const ADrawRect: TRect; const ADataDrawLeft,
   ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 begin
 end;
 
 procedure THCCustomData.DoDrawItemPaintBefor(const AData: THCCustomData;
-  const ADrawItemIndex: Integer; const ADrawRect: TRect; const ADataDrawLeft,
+  const ADrawItemNo: Integer; const ADrawRect: TRect; const ADataDrawLeft,
   ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
+begin
+end;
+
+procedure THCCustomData.DoDrawItemPaintContent(const AData: THCCustomData;
+  const ADrawItemNo: Integer; const ADrawRect, AClearRect: TRect;
+  const ADrawText: string; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
+  ADataScreenBottom: Integer; const ACanvas: TCanvas;
+  const APaintInfo: TPaintInfo);
+begin
+end;
+
+procedure THCCustomData.DoItemAction(const AItemNo, AOffset: Integer;
+  const AAction: THCItemAction);
 begin
 end;
 
 procedure THCCustomData.DrawItemPaintAfter(const AData: THCCustomData;
-  const ADrawItemIndex: Integer; const ADrawRect: TRect; const ADataDrawLeft,
+  const ADrawItemNo: Integer; const ADrawRect: TRect; const ADataDrawLeft,
   ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 var
@@ -755,15 +811,16 @@ var
 begin
   vDCState := SaveDC(ACanvas.Handle);
   try
-    DoDrawItemPaintAfter(AData, ADrawItemIndex, ADrawRect, ADataDrawLeft, ADataDrawBottom,
+    DoDrawItemPaintAfter(AData, ADrawItemNo, ADrawRect, ADataDrawLeft, ADataDrawBottom,
       ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
   finally
-    ReleaseDC(ACanvas.Handle, vDCState);
+    RestoreDC(ACanvas.Handle, vDCState);
+    ACanvas.Refresh;
   end;
 end;
 
 procedure THCCustomData.DrawItemPaintBefor(const AData: THCCustomData;
-  const ADrawItemIndex: Integer; const ADrawRect: TRect; const ADataDrawLeft,
+  const ADrawItemNo: Integer; const ADrawRect: TRect; const ADataDrawLeft,
   ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 var
@@ -771,16 +828,34 @@ var
 begin
   vDCState := SaveDC(ACanvas.Handle);
   try
-    DoDrawItemPaintBefor(AData, ADrawItemIndex, ADrawRect, ADataDrawLeft, ADataDrawBottom,
+    DoDrawItemPaintBefor(AData, ADrawItemNo, ADrawRect, ADataDrawLeft, ADataDrawBottom,
       ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
   finally
-    ReleaseDC(ACanvas.Handle, vDCState);
+    RestoreDC(ACanvas.Handle, vDCState);
+    ACanvas.Refresh;
   end;
 end;
 
-function THCCustomData.EmptyData: Boolean;
+procedure THCCustomData.DrawItemPaintContent(const AData: THCCustomData;
+  const ADrawItemNo: Integer; const ADrawRect, AClearRect: TRect;
+  const ADrawText: string; const ADataDrawLeft, ADataDrawBottom, ADataScreenTop,
+  ADataScreenBottom: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
+var
+  vDCState: Integer;
 begin
-  Result := (FItems.Count = 1) and (FItems[0].StyleNo > THCStyle.RsNull) and (FItems[0].Text = '');
+  vDCState := SaveDC(ACanvas.Handle);
+  try
+    DoDrawItemPaintContent(AData, ADrawItemNo, ADrawRect, AClearRect, ADrawText,
+      ADataDrawLeft, ADataDrawBottom, ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
+  finally
+    RestoreDC(ACanvas.Handle, vDCState);
+    ACanvas.Refresh;
+  end;
+end;
+
+function THCCustomData.IsEmptyData: Boolean;
+begin
+  Result := (FItems.Count = 1) and (FItems[0].StyleNo > THCStyle.Null) and (FItems[0].Text = '');
 end;
 
 procedure THCCustomData.GetDataDrawItemRang(const ATop,
@@ -790,12 +865,12 @@ var
 begin
   AFirstDItemNo := -1;
   ALastDItemNo := -1;
-  // »ñÈ¡µÚÒ»¸ö¿ÉÏÔÊ¾µÄDrawItem
+  // è·å–ç¬¬ä¸€ä¸ªå¯æ˜¾ç¤ºçš„DrawItem
   for i := 0 to FDrawItems.Count - 1 do
   begin
     if (FDrawItems[i].LineFirst)
-      and (FDrawItems[i].Rect.Bottom > ATop)  // µ×²¿³¬¹ıÇøÓòÉÏ±ß
-      and (FDrawItems[i].Rect.Top < ABottom)  // ¶¥²¿Ã»³¬¹ıÇøÓòÏÂ±ß
+      and (FDrawItems[i].Rect.Bottom > ATop)  // åº•éƒ¨è¶…è¿‡åŒºåŸŸä¸Šè¾¹
+      and (FDrawItems[i].Rect.Top < ABottom)  // é¡¶éƒ¨æ²¡è¶…è¿‡åŒºåŸŸä¸‹è¾¹
     then
     begin
       AFirstDItemNo := i;
@@ -803,25 +878,38 @@ begin
     end;
   end;
 
-  if AFirstDItemNo < 0 then Exit;  // µÚ1¸ö²»´æÔÚÔòÍË³ö
+  if AFirstDItemNo < 0 then Exit;  // ç¬¬1ä¸ªä¸å­˜åœ¨åˆ™é€€å‡º
 
-  // »ñÈ¡×îºóÒ»¸ö¿ÉÏÔÊ¾µÄDrawItem
+  // è·å–æœ€åä¸€ä¸ªå¯æ˜¾ç¤ºçš„DrawItem
   for i := AFirstDItemNo to FDrawItems.Count - 1 do
   begin
     if (FDrawItems[i].LineFirst) and (FDrawItems[i].Rect.Top >= ABottom) then
     begin
       ALastDItemNo := i - 1;
       Break;
-    end
-    {else
-    if (FDrawItems[i].Rect.Bottom > ABottom) then
-    begin
-      ALastDItemNo := i;
-      Break;
-    end};
+    end;
   end;
-  if ALastDItemNo < 0 then  // ¸ß¶È³¬¹ıData¸ß¶ÈÊ±£¬ÒÔ×îºó1¸ö½áÊø
+  if ALastDItemNo < 0 then  // é«˜åº¦è¶…è¿‡Dataé«˜åº¦æ—¶ï¼Œä»¥æœ€å1ä¸ªç»“æŸ
     ALastDItemNo := FDrawItems.Count - 1;
+end;
+
+function THCCustomData.GetDrawItemLineSpace(const ADrawNo: Integer): Integer;
+var
+  vCanvas: TCanvas;
+begin
+  Result := LineSpaceMin;
+
+  if GetDrawItemStyle(ADrawNo) >= THCStyle.Null then
+  begin
+    vCanvas := THCStyle.CreateStyleCanvas;
+    try
+      Result := CalculateLineHeight(vCanvas,
+        FStyle.TextStyles[GetDrawItemStyle(ADrawNo)],
+        FStyle.ParaStyles[GetDrawItemParaStyle(ADrawNo)].LineSpaceMode);
+    finally
+      THCStyle.DestroyStyleCanvas(vCanvas);
+    end;
+  end;
 end;
 
 function THCCustomData.GetDrawItemNoByOffset(const AItemNo, AOffset: Integer): Integer;
@@ -829,27 +917,28 @@ var
   i: Integer;
   vDrawItem: THCCustomDrawItem;
 begin
-  Result := -1;
-  if GetItemStyle(AItemNo) < THCStyle.RsNull then  // RectItem
-    Result := FItems[AItemNo].FirstDItemNo
-  else  // TextItem
+  Result := FItems[AItemNo].FirstDItemNo;
+  if FItems[AItemNo].StyleNo > THCStyle.Null then  // TextItem
   begin
-    for i := FItems[AItemNo].FirstDItemNo to FDrawItems.Count - 1 do
+    if FItems[AItemNo].Length > 0 then
     begin
-      vDrawItem := FDrawItems[i];
-      if vDrawItem.ItemNo <> AItemNo then
-        Break;
-
-      if AOffset - vDrawItem.CharOffs < vDrawItem.CharLen then
+      for i := FItems[AItemNo].FirstDItemNo to FDrawItems.Count - 1 do
       begin
-        Result := i;
-        Break;
+        vDrawItem := FDrawItems[i];
+        if vDrawItem.ItemNo <> AItemNo then
+          Break;
+
+        if AOffset - vDrawItem.CharOffs < vDrawItem.CharLen then
+        begin
+          Result := i;
+          Break;
+        end;
       end;
     end;
   end;
 end;
 
-function THCCustomData.GetDrawItemOffset(const ADrawItemNo, X: Integer): Integer;
+function THCCustomData.GetDrawItemOffsetAt(const ADrawItemNo, X: Integer): Integer;
 var
   vX, vCharWidth: Integer;
   vDrawItem: THCCustomDrawItem;
@@ -859,99 +948,99 @@ var
 
   i, j,
   vSplitCount,
-  viSplitW,  // ¸÷×Ö·û»æÖÆÊ±ÖĞ¼äµÄ¼ä¸ô
+  viSplitW,  // å„å­—ç¬¦ç»˜åˆ¶æ—¶ä¸­é—´çš„é—´éš”
   vMod: Integer;
   vItem: THCCustomItem;
 
-  vParaStyle: TParaStyle;
-  vSplitList: THCList;
+  vParaStyle: THCParaStyle;
+  vSplitList: THCIntegerList;
 begin
   Result := 0;
   vDrawItem := FDrawItems[ADrawItemNo];
   vItem  := FItems[vDrawItem.ItemNo];
-  if vItem.StyleNo < FStyle.RsNull then  // ·ÇÎÄ±¾
+  if vItem.StyleNo < THCStyle.Null then  // éæ–‡æœ¬
     Result := (vItem as THCCustomRectItem).GetOffsetAt(X - vDrawItem.Rect.Left)
-  else  // ÎÄ±¾
+  else  // æ–‡æœ¬
   begin
-    Result := vDrawItem.CharLen;  // ¸³ÖµÎª×îºó£¬Îª·½±ãĞĞ×îÓÒ²àµã»÷Ê±·µ»ØÎª×îºóÒ»¸ö
-    vText := (vItem as THCTextItem).GetTextPart(vDrawItem.CharOffs, vDrawItem.CharLen);
-    FStyle.TextStyles[vItem.StyleNo].ApplyStyle(FStyle.DefCanvas);
+    Result := vDrawItem.CharLen;  // èµ‹å€¼ä¸ºæœ€åï¼Œä¸ºæ–¹ä¾¿è¡Œæœ€å³ä¾§ç‚¹å‡»æ—¶è¿”å›ä¸ºæœ€åä¸€ä¸ª
+    vText := (vItem as THCTextItem).SubString(vDrawItem.CharOffs, vDrawItem.CharLen);
+    FStyle.ApplyTempStyle(vItem.StyleNo);
     vParaStyle := FStyle.ParaStyles[vItem.ParaNo];
     vX := vDrawItem.Rect.Left;
 
     case vParaStyle.AlignHorz of
       pahLeft, pahRight, pahCenter:
-        Result := GetCharOffsetByX(FStyle.DefCanvas, vText, X - vX);
+        Result := GetCharOffsetAt(FStyle.TempCanvas, vText, X - vX);
 
-      pahJustify, pahScatter:  // 20170220001 Á½¶Ë¡¢·ÖÉ¢¶ÔÆëÏà¹Ø´¦Àí
+      pahJustify, pahScatter:  // 20170220001 ä¸¤ç«¯ã€åˆ†æ•£å¯¹é½ç›¸å…³å¤„ç†
         begin
-          if vParaStyle.AlignHorz = pahJustify then  // Á½¶Ë¶ÔÆë
+          if vParaStyle.AlignHorz = pahJustify then  // ä¸¤ç«¯å¯¹é½
           begin
-            if IsParaLastDrawItem(ADrawItemNo) then  // Á½¶Ë¶ÔÆë¡¢¶Î×îºóÒ»ĞĞ²»´¦Àí
+            if IsParaLastDrawItem(ADrawItemNo) then  // ä¸¤ç«¯å¯¹é½ã€æ®µæœ€åä¸€è¡Œä¸å¤„ç†
             begin
-              Result := GetCharOffsetByX(FStyle.DefCanvas, vText, X - vX);
+              Result := GetCharOffsetAt(FStyle.TempCanvas, vText, X - vX);
               Exit;
             end;
           end;
           vMod := 0;
-          viSplitW := vDrawItem.Width - FStyle.DefCanvas.TextWidth(vText);  // µ±Ç°DItemµÄRectÖĞÓÃÓÚ·ÖÉ¢µÄ¿Õ¼ä
-          // ¼ÆËãµ±Ç°DitemÄÚÈİ·Ö³É¼¸·İ£¬Ã¿Ò»·İÔÚÄÚÈİÖĞµÄÆğÊ¼Î»ÖÃ
-          vSplitList := THCList.Create;
+          viSplitW := vDrawItem.Width - FStyle.TempCanvas.TextWidth(vText);  // å½“å‰DItemçš„Rectä¸­ç”¨äºåˆ†æ•£çš„ç©ºé—´
+          // è®¡ç®—å½“å‰Ditemå†…å®¹åˆ†æˆå‡ ä»½ï¼Œæ¯ä¸€ä»½åœ¨å†…å®¹ä¸­çš„èµ·å§‹ä½ç½®
+          vSplitList := THCIntegerList.Create;
           try
             vSplitCount := GetJustifyCount(vText, vSplitList);
             vLineLast := IsLineLastDrawItem(ADrawItemNo);
-            if vLineLast and (vSplitCount > 0) then  // ĞĞ×îºóDItem£¬ÉÙ·ÖÒ»¸ö
+            if vLineLast and (vSplitCount > 0) then  // è¡Œæœ€åDItemï¼Œå°‘åˆ†ä¸€ä¸ª
               Dec(vSplitCount);
-            if vSplitCount > 0 then  // ÓĞ·Öµ½¼ä¾à
+            if vSplitCount > 0 then  // æœ‰åˆ†åˆ°é—´è·
             begin
               vMod := viSplitW mod vSplitCount;
               viSplitW := viSplitW div vSplitCount;
             end;
 
             //vSplitCount := 0;
-            for i := 0 to vSplitList.Count - 2 do  // vSplitList×îºóÒ»¸öÊÇ×Ö·û´®³¤¶ÈËùÒÔ¶à¼õ1
+            for i := 0 to vSplitList.Count - 2 do  // vSplitListæœ€åä¸€ä¸ªæ˜¯å­—ç¬¦ä¸²é•¿åº¦æ‰€ä»¥å¤šå‡1
             begin
-              vS := Copy(vText, vSplitList[i], vSplitList[i + 1] - vSplitList[i]);  // µ±Ç°·Ö¸ôµÄÒ»¸ö×Ö·û´®
-              vCharWidth := FStyle.DefCanvas.TextWidth(vS);
+              vS := Copy(vText, vSplitList[i], vSplitList[i + 1] - vSplitList[i]);  // å½“å‰åˆ†éš”çš„ä¸€ä¸ªå­—ç¬¦ä¸²
+              vCharWidth := FStyle.TempCanvas.TextWidth(vS);
               if vMod > 0 then
               begin
-                Inc(vCharWidth);  // ¶à·ÖµÄÓàÊı
+                Inc(vCharWidth);  // å¤šåˆ†çš„ä½™æ•°
                 vSplitCount := 1;
                 Dec(vMod);
               end
               else
                 vSplitCount := 0;
-              { Ôö¼Ó¼ä¾à }
-              if i <> vSplitList.Count - 2 then  // ²»ÊÇµ±Ç°DItem·Ö¸ôµÄ×îºóÒ»¸ö
-                vCharWidth := vCharWidth + viSplitW  // ·Ö¸ô¼ä¾à
-              else  // ÊÇµ±Ç°DItem·Ö¸ôµÄ×îºóÒ»¸ö
+              { å¢åŠ é—´è· }
+              if i <> vSplitList.Count - 2 then  // ä¸æ˜¯å½“å‰DItemåˆ†éš”çš„æœ€åä¸€ä¸ª
+                vCharWidth := vCharWidth + viSplitW  // åˆ†éš”é—´è·
+              else  // æ˜¯å½“å‰DItemåˆ†éš”çš„æœ€åä¸€ä¸ª
               begin
-                if not vLineLast then  // ²»ÊÇĞĞ×îºóÒ»¸öDItem
-                  vCharWidth := vCharWidth + viSplitW;  // ·Ö¸ô¼ä¾à
+                if not vLineLast then  // ä¸æ˜¯è¡Œæœ€åä¸€ä¸ªDItem
+                  vCharWidth := vCharWidth + viSplitW;  // åˆ†éš”é—´è·
               end;
 
-              if vX + vCharWidth > X then  // µ±Ç°×Ö·û½áÊøÎ»ÖÃÔÚXºó£¬ÕÒµ½ÁËÎ»ÖÃ
+              if vX + vCharWidth > X then  // å½“å‰å­—ç¬¦ç»“æŸä½ç½®åœ¨Xåï¼Œæ‰¾åˆ°äº†ä½ç½®
               begin
-                vMod := Length(vS);  // ½èÓÃ±äÁ¿£¬×¼±¸´¦Àí  a b c d e fgh ijklm n opqµÄĞÎÊ½(¶à¸ö×Ö·ûÎªÒ»¸ö·Ö¸ô´®)
-                for j := 1 to vMod do  // ÕÒÔÚµ±Ç°·Ö¸ôµÄÒ»¸ö×Ö·û´®ÖĞÄÄÒ»¸öÎ»ÖÃ
+                vMod := Length(vS);  // å€Ÿç”¨å˜é‡ï¼Œå‡†å¤‡å¤„ç†  a b c d e fgh ijklm n opqçš„å½¢å¼(å¤šä¸ªå­—ç¬¦ä¸ºä¸€ä¸ªåˆ†éš”ä¸²)
+                for j := 1 to vMod do  // æ‰¾åœ¨å½“å‰åˆ†éš”çš„ä¸€ä¸ªå­—ç¬¦ä¸²ä¸­å“ªä¸€ä¸ªä½ç½®
                 begin
-                  vCharWidth := FStyle.DefCanvas.TextWidth(vS[j]);
-                  if i <> vSplitList.Count - 2 then  // ²»ÊÇµ±Ç°DItem·Ö¸ôµÄ×îºóÒ»¸ö
+                  vCharWidth := FStyle.TempCanvas.TextWidth(vS[j]);
+                  if i <> vSplitList.Count - 2 then  // ä¸æ˜¯å½“å‰DItemåˆ†éš”çš„æœ€åä¸€ä¸ª
                   begin
                     if j = vMod then
                       vCharWidth := vCharWidth + viSplitW + vSplitCount;
                   end
-                  else  // ÊÇµ±Ç°DItem·Ö¸ôµÄ×îºóÒ»¸ö
+                  else  // æ˜¯å½“å‰DItemåˆ†éš”çš„æœ€åä¸€ä¸ª
                   begin
-                    if not vLineLast then  // ²»ÊÇĞĞ×îºóÒ»¸öDItem
-                      vCharWidth := vCharWidth + viSplitW + vSplitCount;  // ·Ö¸ô¼ä¾à
+                    if not vLineLast then  // ä¸æ˜¯è¡Œæœ€åä¸€ä¸ªDItem
+                      vCharWidth := vCharWidth + viSplitW + vSplitCount;  // åˆ†éš”é—´è·
                   end;
 
                   vX := vX + vCharWidth;
-                  if vX > X then  // µ±Ç°×Ö·û½áÊøÎ»ÖÃÔÚXºó
+                  if vX > X then  // å½“å‰å­—ç¬¦ç»“æŸä½ç½®åœ¨Xå
                   begin
-                    if vX - vCharWidth div 2 > X then  // µã»÷ÔÚÇ°°ë²¿·Ö
-                      Result := vSplitList[i] - 1 + j - 1  // ¼ÆÎªÇ°Ò»¸öºóÃæ
+                    if vX - vCharWidth div 2 > X then  // ç‚¹å‡»åœ¨å‰åŠéƒ¨åˆ†
+                      Result := vSplitList[i] - 1 + j - 1  // è®¡ä¸ºå‰ä¸€ä¸ªåé¢
                     else
                       Result := vSplitList[i] - 1 + j;
                     Break;
@@ -971,75 +1060,83 @@ begin
   end;
 end;
 
-function THCCustomData.GetDrawItemOffsetWidth(const ADrawItemNo, ADrawOffs: Integer): Integer;
+function THCCustomData.GetDrawItemOffsetWidth(const ADrawItemNo, ADrawOffs: Integer;
+  const AStyleCanvas: TCanvas = nil): Integer;
 var
   vStyleNo: Integer;
   vAlignHorz: TParaAlignHorz;
-  vDItem: THCCustomDrawItem;
-  
-  vSplitList: THCList;
+  vDrawItem: THCCustomDrawItem;
+
+  vSplitList: THCIntegerList;
   vLineLast: Boolean;
   vText, vS: string;
   i, j, viSplitW, vSplitCount, vMod, vCharWidth, vDOffset
     : Integer;
+  vCanvas: TCanvas;
 begin
   Result := 0;
   if ADrawOffs = 0 then Exit;
-  
-  vDItem := FDrawItems[ADrawItemNo];
-  vStyleNo := FItems[vDItem.ItemNo].StyleNo;
-  if vStyleNo < THCStyle.RsNull then  // ·ÇÎÄ±¾
+
+  vDrawItem := FDrawItems[ADrawItemNo];
+  vStyleNo := FItems[vDrawItem.ItemNo].StyleNo;
+  if vStyleNo < THCStyle.Null then  // éæ–‡æœ¬
   begin
-    if ADrawOffs > 0 then
+    if ADrawOffs > OffsetBefor then
       Result := FDrawItems[ADrawItemNo].Width;
   end
   else
   begin
-    FStyle.TextStyles[vStyleNo].ApplyStyle(FStyle.DefCanvas);
+    if Assigned(AStyleCanvas) then
+      vCanvas := AStyleCanvas
+    else
+    begin
+      vCanvas := FStyle.TempCanvas;
+      FStyle.TextStyles[vStyleNo].ApplyStyle(vCanvas);
+    end;
 
     vAlignHorz := FStyle.ParaStyles[GetDrawItemParaStyle(ADrawItemNo)].AlignHorz;
     case vAlignHorz of
       pahLeft, pahRight, pahCenter:
         begin
-          Result := FStyle.DefCanvas.TextWidth(Copy(FItems[vDItem.ItemNo].Text,
-            vDItem.CharOffs, ADrawOffs));
+          Result := vCanvas.TextWidth(Copy(FItems[vDrawItem.ItemNo].Text,
+            vDrawItem.CharOffs, ADrawOffs));
         end;
-      pahJustify, pahScatter:  // 20170220001 Á½¶Ë¡¢·ÖÉ¢¶ÔÆëÏà¹Ø´¦Àí
+      pahJustify, pahScatter:  // 20170220001 ä¸¤ç«¯ã€åˆ†æ•£å¯¹é½ç›¸å…³å¤„ç†
         begin
-          if vAlignHorz = pahJustify then  // Á½¶Ë¶ÔÆë
+          if vAlignHorz = pahJustify then  // ä¸¤ç«¯å¯¹é½
           begin
-            if IsParaLastDrawItem(ADrawItemNo) then  // Á½¶Ë¶ÔÆë¡¢¶Î×îºóÒ»ĞĞ²»´¦Àí
+            if IsParaLastDrawItem(ADrawItemNo) then  // ä¸¤ç«¯å¯¹é½ã€æ®µæœ€åä¸€è¡Œä¸å¤„ç†
             begin
-              Result := FStyle.DefCanvas.TextWidth(Copy(FItems[vDItem.ItemNo].Text,
-                vDItem.CharOffs, ADrawOffs));
+              Result := vCanvas.TextWidth(Copy(FItems[vDrawItem.ItemNo].Text,
+                vDrawItem.CharOffs, ADrawOffs));
               Exit;
             end;
           end;
 
           vText := GetDrawItemText(ADrawItemNo);
-          viSplitW := vDItem.Width - FStyle.DefCanvas.TextWidth(vText);  // µ±Ç°DItemµÄRectÖĞÓÃÓÚ·ÖÉ¢µÄ¿Õ¼ä
+          viSplitW := vDrawItem.Width - vCanvas.TextWidth(vText);  // å½“å‰DItemçš„Rectä¸­ç”¨äºåˆ†æ•£çš„ç©ºé—´
           vMod := 0;
-          // ¼ÆËãµ±Ç°DitemÄÚÈİ·Ö³É¼¸·İ£¬Ã¿Ò»·İÔÚÄÚÈİÖĞµÄÆğÊ¼Î»ÖÃ
-          vSplitList := THCList.Create;
+          // è®¡ç®—å½“å‰Ditemå†…å®¹åˆ†æˆå‡ ä»½ï¼Œæ¯ä¸€ä»½åœ¨å†…å®¹ä¸­çš„èµ·å§‹ä½ç½®
+          vSplitList := THCIntegerList.Create;
           try
             vSplitCount := GetJustifyCount(vText, vSplitList);
             vLineLast := IsLineLastDrawItem(ADrawItemNo);
-            if vLineLast and (vSplitCount > 0) then  // ĞĞ×îºóDItem£¬ÉÙ·ÖÒ»¸ö
+            if vLineLast and (vSplitCount > 0) then  // è¡Œæœ€åDItemï¼Œå°‘åˆ†ä¸€ä¸ª
               Dec(vSplitCount);
-            if vSplitCount > 0 then  // ÓĞ·Öµ½¼ä¾à
+            if vSplitCount > 0 then  // æœ‰åˆ†åˆ°é—´è·
             begin
               vMod := viSplitW mod vSplitCount;
               viSplitW := viSplitW div vSplitCount;
             end;
 
-            vSplitCount := 0;  // ½èÓÃ±äÁ¿
-            for i := 0 to vSplitList.Count - 2 do  // vSplitList×îºóÒ»¸öÊÇ×Ö·û´®³¤¶ÈËùÒÔ¶à¼õ1
+            //vSplitCount := 0;  // å€Ÿç”¨å˜é‡
+            for i := 0 to vSplitList.Count - 2 do  // vSplitListæœ€åä¸€ä¸ªæ˜¯å­—ç¬¦ä¸²é•¿åº¦æ‰€ä»¥å¤šå‡1
             begin
-              vS := Copy(vText, vSplitList[i], vSplitList[i + 1] - vSplitList[i]);  // µ±Ç°·Ö¸ôµÄÒ»¸ö×Ö·û´®
-              vCharWidth := FStyle.DefCanvas.TextWidth(vS);
+              vS := Copy(vText, vSplitList[i], vSplitList[i + 1] - vSplitList[i]);  // å½“å‰åˆ†éš”çš„ä¸€ä¸ªå­—ç¬¦ä¸²
+              vCharWidth := vCanvas.TextWidth(vS);
               if vMod > 0 then
               begin
-                Inc(vCharWidth);  // ¶à·ÖµÄÓàÊı
+                Inc(vCharWidth);  // å¤šåˆ†çš„ä½™æ•°
                 vSplitCount := 1;
                 Dec(vMod);
               end
@@ -1047,38 +1144,38 @@ begin
                 vSplitCount := 0;
 
               vDOffset := vSplitList[i] + Length(vS) - 1;
-              if vDOffset <= ADrawOffs then  // µ±Ç°×Ö·û½áÊøÎ»ÖÃÔÚAOffsÇ°
+              if vDOffset <= ADrawOffs then  // å½“å‰å­—ç¬¦ç»“æŸä½ç½®åœ¨AOffså‰
               begin
-                { Ôö¼Ó¼ä¾à }
-                if i <> vSplitList.Count - 2 then  // ²»ÊÇµ±Ç°DItem·Ö¸ôµÄ×îºóÒ»¸ö
-                  vCharWidth := vCharWidth + viSplitW  // ·Ö¸ô¼ä¾à
-                else  // ÊÇµ±Ç°DItem·Ö¸ôµÄ×îºóÒ»¸ö
+                { å¢åŠ é—´è· }
+                if i <> vSplitList.Count - 2 then  // ä¸æ˜¯å½“å‰DItemåˆ†éš”çš„æœ€åä¸€ä¸ª
+                  vCharWidth := vCharWidth + viSplitW  // åˆ†éš”é—´è·
+                else  // æ˜¯å½“å‰DItemåˆ†éš”çš„æœ€åä¸€ä¸ª
                 begin
-                  if not vLineLast then  // ²»ÊÇĞĞ×îºóÒ»¸öDItem
-                    vCharWidth := vCharWidth + viSplitW;  // ·Ö¸ô¼ä¾à
+                  if not vLineLast then  // ä¸æ˜¯è¡Œæœ€åä¸€ä¸ªDItem
+                    vCharWidth := vCharWidth + viSplitW;  // åˆ†éš”é—´è·
                 end;
 
                 Result := Result + vCharWidth;
                 if vDOffset = ADrawOffs then
                   Break;
               end
-              else  // µ±Ç°×Ö·û½áÊøÎ»ÖÃÔÚAOffsºó£¬ÕÒ¾ßÌåÎ»ÖÃ
+              else  // å½“å‰å­—ç¬¦ç»“æŸä½ç½®åœ¨AOffsåï¼Œæ‰¾å…·ä½“ä½ç½®
               begin
-                // ×¼±¸´¦Àí  a b c d e fgh ijklm n opqµÄĞÎÊ½(¶à¸ö×Ö·ûÎªÒ»¸ö·Ö¸ô´®)
-                for j := 1 to Length(vS) do  // ÕÒÔÚµ±Ç°·Ö¸ôµÄÕâ´®×Ö·û´®ÖĞÄÄÒ»¸öÎ»ÖÃ
+                // å‡†å¤‡å¤„ç†  a b c d e fgh ijklm n opqçš„å½¢å¼(å¤šä¸ªå­—ç¬¦ä¸ºä¸€ä¸ªåˆ†éš”ä¸²)
+                for j := 1 to Length(vS) do  // æ‰¾åœ¨å½“å‰åˆ†éš”çš„è¿™ä¸²å­—ç¬¦ä¸²ä¸­å“ªä¸€ä¸ªä½ç½®
                 begin
-                  vCharWidth := FStyle.DefCanvas.TextWidth(vS[j]);
+                  vCharWidth := vCanvas.TextWidth(vS[j]);
 
                   vDOffset := vSplitList[i] - 1 + j;
-                  if vDOffset = vDItem.CharLen then  // ÊÇµ±Ç°DItem×îºóÒ»¸ö·Ö¸ô´®
+                  if vDOffset = vDrawItem.CharLen then  // æ˜¯å½“å‰DItemæœ€åä¸€ä¸ªåˆ†éš”ä¸²
                   begin
-                    if not vLineLast then  // µ±Ç°DItem²»ÊÇĞĞ×îºóÒ»¸öDItem
-                      vCharWidth := vCharWidth + viSplitW + vSplitCount;  // µ±Ç°DItem×îºóÒ»¸ö×Ö·ûÏíÊÜ·Ö¸ô¼ä¾àºÍ¶à·ÖµÄÓàÊı
-                    //else ĞĞ×îºóÒ»¸öDItemµÄ×îºóÒ»¸ö×Ö·û²»ÏíÊÜ·Ö¸ô¼ä¾àºÍ¶à·ÖµÄÓàÊı£¬ÒòÎª´®¸ñÊ½»¯Ê±×îºóÒ»¸ö·Ö¸ô×Ö·û´®ÓÒ²à¾Í²»·Ö¼ä¾à
+                    if not vLineLast then  // å½“å‰DItemä¸æ˜¯è¡Œæœ€åä¸€ä¸ªDItem
+                      vCharWidth := vCharWidth + viSplitW + vSplitCount;  // å½“å‰DItemæœ€åä¸€ä¸ªå­—ç¬¦äº«å—åˆ†éš”é—´è·å’Œå¤šåˆ†çš„ä½™æ•°
+                    //else è¡Œæœ€åä¸€ä¸ªDItemçš„æœ€åä¸€ä¸ªå­—ç¬¦ä¸äº«å—åˆ†éš”é—´è·å’Œå¤šåˆ†çš„ä½™æ•°ï¼Œå› ä¸ºä¸²æ ¼å¼åŒ–æ—¶æœ€åä¸€ä¸ªåˆ†éš”å­—ç¬¦ä¸²å³ä¾§å°±ä¸åˆ†é—´è·
                   end;
                   Result := Result + vCharWidth;
 
-                  if vDOffset = ADrawOffs then  // µ±Ç°×Ö·û½áÊøÎ»ÖÃÔÚXºó
+                  if vDOffset = ADrawOffs then  // å½“å‰å­—ç¬¦ç»“æŸä½ç½®åœ¨Xå
                     Break;
                 end;
 
@@ -1105,28 +1202,20 @@ end;
 
 function THCCustomData.GetDrawItemText(const ADrawItemNo: Integer): string;
 var
-  vDItem: THCCustomDrawItem;
+  vDrawItem: THCCustomDrawItem;
 begin
-  vDItem := FDrawItems[ADrawItemNo];
-  Result := FItems[vDItem.ItemNo].Text;
-  if Result <> '' then
-    Result := Copy(Result, vDItem.CharOffs, vDItem.CharLen);
+  vDrawItem := FDrawItems[ADrawItemNo];
+  //SetString(Result, PChar(FItems[vDrawItem.ItemNo].Text), vDrawItem.CharLen);
+  Result := Copy(FItems[vDrawItem.ItemNo].Text, vDrawItem.CharOffs, vDrawItem.CharLen);
 end;
 
-{function THCCustomData.GetFormatStartItemNo(const AItemNo: Integer): Integer;
-var
-  i: Integer;
+function THCCustomData.GetItemOffsetAfter(const AItemNo: Integer): Integer;
 begin
-  Result := AItemNo;
-  for i := FItems[AItemNo].FirstDItemNo downto 0 do
-  begin
-    if FDrawItems[i].LineFirst then
-    begin
-      Result := FDrawItems[i].ItemNo;
-      Break;
-    end;
-  end;
-end;}
+  if FItems[AItemNo].StyleNo < THCStyle.Null then
+    Result := OffsetAfter
+  else
+    Result := FItems[AItemNo].Length;
+end;
 
 procedure THCCustomData.GetItemAt(const X, Y: Integer;
   var AItemNo, AOffset, ADrawItemNo: Integer; var ARestrain: Boolean);
@@ -1137,9 +1226,9 @@ begin
   AItemNo := -1;
   AOffset := -1;
   ADrawItemNo := -1;
-  ARestrain := True;  // Ä¬ÈÏÎªÔ¼ÊøÕÒµ½(²»ÔÚItemÉÏÃæ)
+  ARestrain := True;  // é»˜è®¤ä¸ºçº¦æŸæ‰¾åˆ°(ä¸åœ¨Itemä¸Šé¢)
 
-  if EmptyData then
+  if IsEmptyData then
   begin
     AItemNo := 0;
     AOffset := 0;
@@ -1147,93 +1236,105 @@ begin
     Exit;
   end;
 
-  { »ñÈ¡¶ÔÓ¦Î»ÖÃ×î½Ó½üµÄÆğÊ¼DrawItem }
+  { è·å–å¯¹åº”ä½ç½®æœ€æ¥è¿‘çš„èµ·å§‹DrawItem }
   if Y < 0 then
     vStartDItemNo := 0
-  else  // ÅĞ¶ÏÔÚÄÄÒ»ĞĞ
+  else  // åˆ¤æ–­åœ¨å“ªä¸€è¡Œ
   begin
     vDrawRect := FDrawItems.Last.Rect;
-    if Y > vDrawRect.Bottom then  // ×îºóÒ»¸öÏÂÃæ
+    if Y > vDrawRect.Bottom then  // æœ€åä¸€ä¸ªä¸‹é¢
       vStartDItemNo := FDrawItems.Count - 1
-    else  // ¶ş·Ö·¨²éÕÒÄÄ¸öItem
+    else  // äºŒåˆ†æ³•æŸ¥æ‰¾å“ªä¸ªItem
     begin
       vStartDItemNo := 0;
       vEndDItemNo := FDrawItems.Count - 1;
 
       while True do
       begin
-        if vEndDItemNo - vStartDItemNo > 1 then  // Ïà²î´óÓÚ1
+        if vEndDItemNo - vStartDItemNo > 1 then  // ç›¸å·®å¤§äº1
         begin
           i := vStartDItemNo + (vEndDItemNo - vStartDItemNo) div 2;
-          if Y > FDrawItems[i].Rect.Bottom then  // ´óÓÚÖĞ¼äÎ»ÖÃ
+          if Y > FDrawItems[i].Rect.Bottom then  // å¤§äºä¸­é—´ä½ç½®
           begin
-            vStartDItemNo := i + 1;  // ÖĞ¼äÎ»ÖÃÏÂÒ»¸ö
+            vStartDItemNo := i + 1;  // ä¸­é—´ä½ç½®ä¸‹ä¸€ä¸ª
             Continue;
           end
           else
-          if Y < FDrawItems[i].Rect.Top then  // Ğ¡ÓÚÖĞ¼äÎ»ÖÃ
+          if Y < FDrawItems[i].Rect.Top then  // å°äºä¸­é—´ä½ç½®
           begin
-            vEndDItemNo := i - 1;  // ÖĞ¼äÎ»ÖÃÉÏÒ»¸ö
+            vEndDItemNo := i - 1;  // ä¸­é—´ä½ç½®ä¸Šä¸€ä¸ª
             Continue;
           end
           else
           begin
-            vStartDItemNo := i;  // ÕıºÃÊÇÖĞ¼äÎ»ÖÃµÄ
+            vStartDItemNo := i;  // æ­£å¥½æ˜¯ä¸­é—´ä½ç½®çš„
             Break;
           end;
         end
-        else  // Ïà²î1
+        else  // ç›¸å·®1
         begin
-          if Y > FDrawItems[vEndDItemNo].Rect.Bottom then  // µÚ¶ş¸öÏÂÃæ
+          if Y > FDrawItems[vEndDItemNo].Rect.Bottom then  // ç¬¬äºŒä¸ªä¸‹é¢
             vStartDItemNo := vEndDItemNo
           else
-          if Y > FDrawItems[vEndDItemNo].Rect.Top then  // µÚ¶ş¸ö
+          if Y >= FDrawItems[vEndDItemNo].Rect.Top then  // ç¬¬äºŒä¸ª
             vStartDItemNo := vEndDItemNo;
-          //else ²»´¦Àí¼´µÚÒ»¸ö
+          //else ä¸å¤„ç†å³ç¬¬ä¸€ä¸ª
           Break;
         end;
       end;
     end;
 
-    if Y < FDrawItems[vStartDItemNo].Rect.Top then  // ´¦ÀíÔÚÒ³µ×²¿Êı¾İÏÂÃæÊ±£¬vStartDItemNoÊÇÏÂÒ»Ò³µÚÒ»¸öµÄÇé¿ö
+    if Y < FDrawItems[vStartDItemNo].Rect.Top then  // å¤„ç†åœ¨é¡µåº•éƒ¨æ•°æ®ä¸‹é¢æ—¶ï¼ŒvStartDItemNoæ˜¯ä¸‹ä¸€é¡µç¬¬ä¸€ä¸ªçš„æƒ…å†µ
       Dec(vStartDItemNo);
   end;
 
-  // ÅĞ¶ÏÊÇÖ¸¶¨ĞĞÖĞÄÄÒ»¸öItem
-  GetLineDrawItemRang(vStartDItemNo, vEndDItemNo);  // ĞĞÆğÊ¼ºÍ½áÊøDrawItem
-  if X <= FDrawItems[vStartDItemNo].Rect.Left then  // ¾ÓÖĞÊ±£¬ÔÚĞĞµÚÒ»¸ö×ó±ßµã»÷
+  // åˆ¤æ–­æ˜¯æŒ‡å®šè¡Œä¸­å“ªä¸€ä¸ªItem
+  GetLineDrawItemRang(vStartDItemNo, vEndDItemNo);  // è¡Œèµ·å§‹å’Œç»“æŸDrawItem
+  if X <= FDrawItems[vStartDItemNo].Rect.Left then  // åœ¨è¡Œç¬¬ä¸€ä¸ªå·¦è¾¹ç‚¹å‡»
   begin
     ADrawItemNo := vStartDItemNo;
     AItemNo := FDrawItems[vStartDItemNo].ItemNo;
-    if FItems[AItemNo].StyleNo < THCStyle.RsNull then
-      AOffset := OffsetBefor
+    if FItems[AItemNo].StyleNo < THCStyle.Null then
+      AOffset := OffsetBefor  // GetDrawItemOffsetAt(vStartDItemNo, X)
     else
-      AOffset := FDrawItems[vStartDItemNo].CharOffs - 1;  // DrawItemÆğÊ¼
+      AOffset := FDrawItems[vStartDItemNo].CharOffs - 1;  // DrawItemèµ·å§‹
   end
   else
-  if X >= FDrawItems[vEndDItemNo].Rect.Right then  // ¾ÓÖĞÊ±£¬ÔÚÓÒ±ßµã»÷
+  if X >= FDrawItems[vEndDItemNo].Rect.Right then  // åœ¨è¡Œå³è¾¹ç‚¹å‡»
   begin
     ADrawItemNo := vEndDItemNo;
     AItemNo := FDrawItems[vEndDItemNo].ItemNo;
-    if FItems[AItemNo].StyleNo < THCStyle.RsNull then
-      AOffset := OffsetAfter
+    if FItems[AItemNo].StyleNo < THCStyle.Null then
+      AOffset := OffsetAfter  // GetDrawItemOffsetAt(vEndDItemNo, X)
     else
-      AOffset := FDrawItems[vEndDItemNo].CharOffs + FDrawItems[vEndDItemNo].CharLen - 1;  // DrawItem×îºó
+      AOffset := FDrawItems[vEndDItemNo].CharOffs + FDrawItems[vEndDItemNo].CharLen - 1;  // DrawItemæœ€å
   end
   else
   begin
-    for i := vStartDItemNo to vEndDItemNo do  // ĞĞÖĞ¼ä
+    for i := vStartDItemNo to vEndDItemNo do  // è¡Œä¸­é—´
     begin
       vDrawRect := FDrawItems[i].Rect;
-      if (X >= vDrawRect.Left) and (X < vDrawRect.Right) then  // 2¸öÖĞ¼äËãºóÃæµÄ
+      if (X >= vDrawRect.Left) and (X < vDrawRect.Right) then  // 2ä¸ªä¸­é—´ç®—åé¢çš„
       begin
+        ARestrain := (Y < vDrawRect.Top) or (Y > vDrawRect.Bottom);
+
         ADrawItemNo := i;
         AItemNo := FDrawItems[i].ItemNo;
-        if FItems[AItemNo].StyleNo < THCStyle.RsNull then
-          AOffset := GetDrawItemOffset(i, X)
-        else
-          AOffset := FDrawItems[i].CharOffs + GetDrawItemOffset(i, X) - 1;
-        ARestrain := (Y < vDrawRect.Top) or (Y > vDrawRect.Bottom);
+        if FItems[AItemNo].StyleNo < THCStyle.Null then  // RectItem
+        begin
+          if ARestrain then  // å‚ç›´æ–¹å‘ä¸Šçº¦æŸ
+          begin
+            if X < vDrawRect.Left + vDrawRect.Width div 2 then
+              AOffset := OffsetBefor
+            else
+              AOffset := OffsetAfter;
+          end
+          else
+            AOffset := GetDrawItemOffsetAt(i, X);
+        end
+        else  // TextItem
+          AOffset := FDrawItems[i].CharOffs + GetDrawItemOffsetAt(i, X) - 1;
+
         Break;
       end;
     end;
@@ -1245,16 +1346,16 @@ function THCCustomData.GetItemLastDrawItemNo(const AItemNo: Integer): Integer;
 //  vItemNo: Integer;
 begin
   Result := -1;
-  // ÔÚReFormatÖĞµ÷ÓÃ´Ë·½·¨Ê±£¬µ±AItemNoÇ°Ãæ´æÔÚÃ»ÓĞ¸ñÊ½»¯¹ıµÄItemÊ±£¬
-  // AItemNo¶ÔÓ¦µÄÔ­DrawItemµÄItemNoÊôĞÔÊÇĞ¡ÓÚAItemNoµÄÖµ£¬ËùÒÔÅĞ¶Ï
-  // AItemNoÔÚÖØĞÂ¸ñÊ½»¯Ç°µÄ×îºóÒ»¸öDrawItem£¬ĞèÒªÊ¹ÓÃAItemNoÔ­DrawItemµÄ
-  // ItemNo×öÎªDrawItemĞÖµÜµÄÅĞ¶ÏÖµ
-  // ÕıÔÚ¸ñÊ½»¯Ê±×îºÃ²»Ê¹ÓÃ´Ë·½·¨£¬ÒòÎªDrawItems.Count¿ÉÄÜÖ»ÊÇµ±Ç°¸ñÊ½»¯µ½µÄItems
+  // åœ¨ReFormatä¸­è°ƒç”¨æ­¤æ–¹æ³•æ—¶ï¼Œå½“AItemNoå‰é¢å­˜åœ¨æ²¡æœ‰æ ¼å¼åŒ–è¿‡çš„Itemæ—¶ï¼Œ
+  // AItemNoå¯¹åº”çš„åŸDrawItemçš„ItemNoå±æ€§æ˜¯å°äºAItemNoçš„å€¼ï¼Œæ‰€ä»¥åˆ¤æ–­
+  // AItemNoåœ¨é‡æ–°æ ¼å¼åŒ–å‰çš„æœ€åä¸€ä¸ªDrawItemï¼Œéœ€è¦ä½¿ç”¨AItemNoåŸDrawItemçš„
+  // ItemNoåšä¸ºDrawItemå…„å¼Ÿçš„åˆ¤æ–­å€¼
+  // æ­£åœ¨æ ¼å¼åŒ–æ—¶æœ€å¥½ä¸ä½¿ç”¨æ­¤æ–¹æ³•ï¼Œå› ä¸ºDrawItems.Countå¯èƒ½åªæ˜¯å½“å‰æ ¼å¼åŒ–åˆ°çš„Items
   {if FItems[AItemNo].FirstDItemNo < 0 then
     vItemNo := AItemNo
   else
     vItemNo := FDrawItems[FItems[AItemNo].FirstDItemNo].ItemNo; }
-  if FItems[AItemNo].FirstDItemNo < 0 then Exit;  // »¹Ã»ÓĞ¸ñÊ½»¯¹ı
+  if FItems[AItemNo].FirstDItemNo < 0 then Exit;  // è¿˜æ²¡æœ‰æ ¼å¼åŒ–è¿‡
 
   Result := FItems[AItemNo].FirstDItemNo + 1;
   while Result < FDrawItems.Count do
@@ -1277,44 +1378,62 @@ begin
   Result := FItems[AItemNo].StyleNo;
 end;
 
-procedure THCCustomData.GetLineDrawItemRang(var AFirstDItemNo, ALastDItemNo: Integer);
+function THCCustomData.GetJustifyCount(const AText: string;
+  const ACharIndexs: THCIntegerList): Integer;
+var
+  i: Integer;
 begin
-  while AFirstDItemNo > 0 do
-  begin
-    if FDrawItems[AFirstDItemNo].LineFirst then
-      Break
-    else
-      Dec(AFirstDItemNo);
-  end;
+  Result := 0;
+  if AText = '' then
+    raise Exception.Create('å¼‚å¸¸ï¼šä¸èƒ½å¯¹ç©ºå­—ç¬¦ä¸²è®¡ç®—åˆ†æ•£ï¼');
 
-  ALastDItemNo := AFirstDItemNo + 1;
-  while ALastDItemNo < FDrawItems.Count do
+  if ACharIndexs <> nil then
+    ACharIndexs.Clear;
+
+  for i := 1 to Length(AText) do
   begin
-    if FDrawItems[ALastDItemNo].LineFirst then
-      Break
-    else
-      Inc(ALastDItemNo);
+    Inc(Result);
+    if ACharIndexs <> nil then
+      ACharIndexs.Add(i);
   end;
-  Dec(ALastDItemNo);
+  if ACharIndexs <> nil then
+    ACharIndexs.Add(Length(AText) + 1);
 end;
 
-function THCCustomData.GetLineFirstItemNo(const AItemNo,
-  AOffset: Integer): Integer;
-var
-  vFirstDItemNo: Integer;
+procedure THCCustomData.GetLineDrawItemRang(var AFirstDrawItemNo, ALastDrawItemNo: Integer);
 begin
-  Result := AItemNo;
-  vFirstDItemNo := GetDrawItemNoByOffset(AItemNo, AOffset);
-
-  while vFirstDItemNo > 0 do
+  while AFirstDrawItemNo > 0 do
   begin
-    if DrawItems[vFirstDItemNo].LineFirst then
+    if FDrawItems[AFirstDrawItemNo].LineFirst then
       Break
     else
-      Dec(vFirstDItemNo);
+      Dec(AFirstDrawItemNo);
   end;
 
-  Result := DrawItems[vFirstDItemNo].ItemNo;
+  ALastDrawItemNo := AFirstDrawItemNo + 1;
+  while ALastDrawItemNo < FDrawItems.Count do
+  begin
+    if FDrawItems[ALastDrawItemNo].LineFirst then
+      Break
+    else
+      Inc(ALastDrawItemNo);
+  end;
+  Dec(ALastDrawItemNo);
+end;
+
+function THCCustomData.GetLineFirstDrawItemNo(const AItemNo,
+  AOffset: Integer): Integer;
+begin
+  Result := AItemNo;
+  Result := GetDrawItemNoByOffset(AItemNo, AOffset);
+
+  while Result > 0 do
+  begin
+    if DrawItems[Result].LineFirst then
+      Break
+    else
+      Dec(Result);
+  end;
 end;
 
 function THCCustomData.GetLineLastItemNo(const AItemNo,
@@ -1323,7 +1442,7 @@ var
   vLastDItemNo: Integer;
 begin
   Result := AItemNo;
-  vLastDItemNo := GetDrawItemNoByOffset(AItemNo, AOffset) + 1;  // ÏÂÒ»¸ö¿ªÊ¼£¬·ñÔòĞĞµÚÒ»¸ö»ñÈ¡×îºóÒ»¸öÊ±»¹ÊÇĞĞµÚÒ»¸ö
+  vLastDItemNo := GetDrawItemNoByOffset(AItemNo, AOffset) + 1;  // ä¸‹ä¸€ä¸ªå¼€å§‹ï¼Œå¦åˆ™è¡Œç¬¬ä¸€ä¸ªè·å–æœ€åä¸€ä¸ªæ—¶è¿˜æ˜¯è¡Œç¬¬ä¸€ä¸ª
   while vLastDItemNo < FDrawItems.Count do
   begin
     if FDrawItems[vLastDItemNo].LineFirst then
@@ -1334,6 +1453,45 @@ begin
   Dec(vLastDItemNo);
 
   Result := DrawItems[vLastDItemNo].ItemNo;
+end;
+
+function THCCustomData.GetLineBlankSpace(const ADrawNo: Integer): Integer;
+var
+  i, vFirst, vLast, vHi, vMaxItemHi, vMaxDrawItemNo: Integer;
+  vCanvas: TCanvas;
+begin
+  Result := 0;
+
+  vFirst := ADrawNo;
+  GetLineDrawItemRang(vFirst, vLast);
+
+  // æ‰¾è¡Œèµ·å§‹å’Œç»“æŸDrawItem
+  // æ‰¾è¡Œä¸­æœ€é«˜çš„DrawItem
+  vMaxItemHi := 0;
+  vCanvas := THCStyle.CreateStyleCanvas;
+  try
+    vMaxDrawItemNo := vFirst;
+    for i := vFirst to vLast do
+    begin
+      if GetDrawItemStyle(i) < THCStyle.Null then
+        vHi := (FItems[FDrawItems[i].ItemNo] as THCCustomRectItem).Height
+      else
+        vHi := FStyle.TextStyles[FItems[FDrawItems[i].ItemNo].StyleNo].FontHeight;
+
+      if vHi > vMaxItemHi then
+      begin
+        vMaxItemHi := vHi;
+        vMaxDrawItemNo := i;  // è®°ä¸‹æœ€é«˜çš„DrawItemNo
+      end;
+    end;
+  finally
+    THCStyle.DestroyStyleCanvas(vCanvas);
+  end;
+
+  if GetDrawItemStyle(vMaxDrawItemNo) < THCStyle.Null then
+    Result := LineSpaceMin
+  else
+    Result := GetDrawItemLineSpace(vMaxDrawItemNo) - vMaxItemHi;  // æ ¹æ®æœ€é«˜çš„DrawItemå–è¡Œé—´è·
 end;
 
 {procedure THCCustomData.GetParaDrawItemRang(const AItemNo: Integer;
@@ -1383,7 +1541,7 @@ end;
 
 function THCCustomData.GetParaLastItemNo(const AItemNo: Integer): Integer;
 begin
-  // Ä¿Ç°ĞèÒªÍâ²¿×Ô¼ºÔ¼ÊøAItemNo < FItems.Count
+  // ç›®å‰éœ€è¦å¤–éƒ¨è‡ªå·±çº¦æŸAItemNo < FItems.Count
   Result := AItemNo + 1;
   while Result < FItems.Count do
   begin
@@ -1393,6 +1551,16 @@ begin
       Inc(Result);
   end;
   Dec(Result);
+end;
+
+function THCCustomData.GetRootData: THCCustomData;
+begin
+  Result := Self;
+end;
+
+function THCCustomData.GetScreenCoord(const X, Y: Integer): TPoint;
+begin
+  Result := Self.GetRootData.GetScreenCoord(X, Y);
 end;
 
 function THCCustomData.GetSelectEndDrawItemNo: Integer;
@@ -1409,569 +1577,28 @@ begin
   if FSelectInfo.StartItemNo < 0 then
     Result := -1
   else
+  begin
     Result := GetDrawItemNoByOffset(FSelectInfo.StartItemNo,
       FSelectInfo.StartItemOffset);
+
+    if (FSelectInfo.EndItemNo >= 0) and (Result < FItems.Count - 1)
+      and (FDrawItems[Result].CharOffsetEnd = FSelectInfo.StartItemOffset)
+    then  // æœ‰é€‰ä¸­æ—¶ï¼ŒSelectInfo.StartItemOffsetåœ¨æœ¬è¡Œæœ€åæ—¶ï¼Œè¦è½¬ä¸ºä¸‹ä¸€è¡Œè¡Œé¦–
+      Inc(Result);
+  end;
 end;
 
-procedure THCCustomData._FormatItemToDrawItems(const AItemNo, AOffs, AContentWidth: Integer;
-  var APos: TPoint; var ALastDNo: Integer);
-
-type
-  TCharType = (
-    jctBreak,  //  ½Ø¶Ïµã
-    jctHZ,  // ºº×Ö
-    jctZM,  // ×ÖÄ¸
-    jctSZ,  // Êı×Ö
-    jctFH   // ·ûºÅ
-    );
-
-  TBreakPosition = (  // ½Ø¶ÏÎ»ÖÃ
-    jbpNone,  // ²»½Ø¶Ï
-    jbpPrev  // ÔÚÇ°Ò»¸öºóÃæ½Ø¶Ï
-    //jbpCur    // ÔÚµ±Ç°ºóÃæ½Ø¶Ï
-    );
-
-
-  {$REGION 'GetTextPlace'}
-  function GetTextPlace(const AWidth: Integer; const AStr: string): Integer;
-  var
-    viLen, viLastCan, vIndex: Integer;
-    vWidth, vWidthCan: Integer;
-    vTempStr: string;
-    vNeedReCalc: Boolean;
-  begin
-    vWidthCan := 0;
-    vNeedReCalc := False;
-    // ¶ş·Ö·¨
-    viLastCan := 0;
-    viLen := Length(AStr);
-    Result := viLen;
-    vIndex := Result;
-    while Result > 0 do
-    begin
-      vTempStr := Copy(AStr, 1, Result);
-      vWidth := FStyle.DefCanvas.TextWidth(vTempStr);
-      if vWidth > AWidth then  // ·Å²»ÏÂ
-      begin
-        if viLastCan > 0 then // ÓÉÄÜ·ÅÏÂµ½·Å²»ÏÂ
-        begin
-          vNeedReCalc := True;  // ĞèÒªÖØĞÂÈ·¶¨¾ßÌå¶Ïµã
-          Break;
-        end;
-        Result := Result - vIndex div 2;  // ÍùÇ°¶ş·Ö
-        if Result = vIndex then  // Ò»¸öÒ²·Å²»ÏÂ?
-        begin
-          vNeedReCalc := True;
-          Break;
-        end;
-        vIndex := Result;
-        if Result = viLastCan then
-        begin
-          vNeedReCalc := False;  // È·¶¨¶Ïµã
-          Break;
-        end;
-      end
-      else
-      begin
-        if Result = viLastCan then
-        begin
-          vNeedReCalc := False;  // È·¶¨¶Ïµã
-          Break;
-        end;
-        viLastCan := Result;  // ¼ÇÂ¼×îºóÒ»¸ö²»ĞèÒª¶ÏµãµÄÎ»ÖÃ
-        vIndex := viLastCan;
-        vWidthCan := vWidth;  // ×îºóÒ»¸ö²»ĞèÒª¶ÏµãËùÕ¼µô¿í¶È
-        Result := Result + (viLen - Result) div 2;  // Íùºó¶ş·Ö
-      end;
-    end;
-
-    if vNeedReCalc then  // ĞèÒªÈ·¶¨¶Ïµã
-    begin
-      vWidth := AWidth - vWidthCan;  // ³ı×îºóÄÜ·ÅÏÂµÄºóÊ£Óà¿í¶È
-      viLen := Result - viLastCan;  // ³ı×îºóÄÜ·ÅÏÂµÄµ½·Å²»ÏÂµÄÖĞ¼ä¸öÊı
-      for vIndex := 1 to viLen do  // ÒÀ´ÎÅĞ¶ÏÔÚÄÄ´¦¶Ïµã
-      begin
-        vTempStr := Copy(AStr, viLastCan + 1, vIndex);
-        vWidthCan := FStyle.DefCanvas.TextWidth(vTempStr);
-        if vWidthCan > vWidth then
-        begin
-          Result := viLastCan + vIndex - 1;  // È·¶¨¶Ïµã
-          Break;
-        end;
-      end;
-    end;
-  end;
-  {$ENDREGION}
-
-  {$REGION 'FinishLine'}
-  /// <summary>
-  /// ÖØÕûĞĞ
-  /// </summary>
-  /// <param name="AEndDItemNo">ĞĞ×îºóÒ»¸öDItem</param>
-  /// <param name="ARemWidth">ĞĞÊ£Óà¿í¶È</param>
-  procedure FinishLine(const ALineEndDItemNo, ARemWidth: Integer);
-  var
-    i,
-    vLineBegDItemNo,  // ĞĞµÚÒ»¸öDItem
-    vMaxBottom,
-    viSplitW, vExtraW, vW
-      : Integer;
-    vReSize: Boolean;
-    vAlignHorz: TParaAlignHorz;
-    vLineSpaceCount,   // µ±Ç°ĞĞ·Ö¼¸·İ
-    vDItemSpaceCount,  // µ±Ç°DrawItem·Ö¼¸·İ
-    vDWidth,
-    vModWidth,
-    vCountWillSplit  // µ±Ç°ĞĞÓĞ¼¸¸öDItem²ÎÓë·Ö·İ
-      : Integer;
-    vDrawItemSplitCounts: array of Word;  // µ±Ç°ĞĞ¸÷DItem·Ö¼¸·İ
-  begin
-    vLineBegDItemNo := ALineEndDItemNo;
-    for i := ALineEndDItemNo downto 0 do  // µÃµ½ĞĞÆğÊ¼DItemNo
-    begin
-      if FDrawItems[i].LineFirst then
-      begin
-        vLineBegDItemNo := i;
-        Break;
-      end;
-    end;
-    Assert((vLineBegDItemNo >= 0), '¶ÏÑÔÊ§°Ü£ºĞĞÆğÊ¼DItemNoĞ¡ÓÚ0£¡');
-    // ÕÒĞĞDItemÖĞRectµ×Î»ÖÃ×î´óµÄ
-    vReSize := False;  // Ä¬ÈÏ±¾ĞĞ²»ĞèÒªµ÷Õû¸÷DItemµÄRect
-    // ÏÖÈ¡ÑùÊ½£¬·ÀÖ¹µ±ÏÂÒ»¶ÎÆğÊ¼Ê±£¬µ÷ÓÃ´Ë·½·¨½áÊøÉÏÒ»¶Î£¬2¶ÎÑùÊ½²»Ò»ÑùÔì³É´íÎó
-    vMaxBottom := FDrawItems[ALineEndDItemNo].Rect.Bottom;  // ÏÈÄ¬ÈÏĞĞ×îºóÒ»¸öDItemµÄRectµ×Î»ÖÃ×î´ó
-    for i := ALineEndDItemNo - 1 downto vLineBegDItemNo do
-    begin
-      //FDrawItems[i].RemWidth := ARemWidth;
-      if FDrawItems[i].Rect.Bottom <> vMaxBottom then  // ĞèÒªÖØĞÂµ÷ÕûĞĞÖĞ¸÷DItemµÄRect
-        vReSize := True;
-      if FDrawItems[i].Rect.Bottom > vMaxBottom then
-        vMaxBottom := FDrawItems[i].Rect.Bottom;  // ¼ÇÏÂ×î´óµÄRectµ×Î»ÖÃ
-    end;
-    if vReSize then  // ĞèÒªÖØĞÂµ÷ÕûĞĞÖĞ¸÷DItem¸ß¶È£¬´¦ÀíĞĞÄÚ²»Í¬ÑùÊ½µÄDItem
-    begin
-      for i := ALineEndDItemNo downto vLineBegDItemNo do
-        FDrawItems[i].Rect.Bottom := vMaxBottom;
-    end;
-    // ´¦Àí¶ÔÆë·½Ê½£¬·ÅÔÚÕâÀï£¬ÊÇÒòÎª·½±ã¼ÆËãĞĞÆğÊ¼ºÍ½áÊøDItem£¬±ÜÃâ»æÖÆÊ±µÄÔËËã
-    vAlignHorz := FStyle.ParaStyles[GetDrawItemParaStyle(ALineEndDItemNo)].AlignHorz;
-    case vAlignHorz of  // ¶ÎÄÚÈİË®Æ½¶ÔÆë·½Ê½
-      pahLeft: ;
-      pahRight:
-        begin
-          for i := ALineEndDItemNo downto vLineBegDItemNo do
-            OffsetRect(FDrawItems[i].Rect, ARemWidth, 0);
-        end;
-
-      pahCenter:
-        begin
-          viSplitW := ARemWidth div 2;
-          for i := ALineEndDItemNo downto vLineBegDItemNo do
-            OffsetRect(FDrawItems[i].Rect, viSplitW, 0);
-        end;
-
-      pahJustify, pahScatter:  // 20170220001 Á½¶Ë¡¢·ÖÉ¢¶ÔÆëÏà¹Ø´¦Àí
-        begin
-          if vAlignHorz = pahJustify then  // Á½¶Ë¶ÔÆë
-          begin
-            if IsParaLastDrawItem(ALineEndDItemNo) then  // Á½¶Ë¶ÔÆë¡¢¶Î×îºóÒ»ĞĞ²»´¦Àí
-              Exit;
-          end;
-
-          vCountWillSplit := 0;
-          vLineSpaceCount := 0;
-          vExtraW := 0;
-          vModWidth := 0;
-          viSplitW := ARemWidth;
-          SetLength(vDrawItemSplitCounts, ALineEndDItemNo - vLineBegDItemNo + 1);
-          for i := vLineBegDItemNo to ALineEndDItemNo do  // ¼ÆËã¿ÕÓà·Ö³É¼¸·İ
-          begin
-            if GetDrawItemStyle(i) < THCStyle.RsNull then  // RectItem
-            begin
-              if (FItems[FDrawItems[i].ItemNo] as THCCustomRectItem).JustifySplit then  // ·ÖÉ¢¶ÔÆëÕ¼¼ä¾à
-                vDItemSpaceCount := 1  // GraphicµÈÕ¼¼ä¾à
-              else
-                vDItemSpaceCount := 0; // TabµÈ²»Õ¼¼ä¾à
-            end
-            else  // TextItem
-            begin
-              vDItemSpaceCount := GetJustifyCount(GetDrawItemText(i), nil);  // µ±Ç°DItem·ÖÁË¼¸·İ
-              if (i = ALineEndDItemNo) and (vDItemSpaceCount > 0) then  // ĞĞÎ²µÄDItem£¬ÉÙ·ÖÒ»¸ö
-                Dec(vDItemSpaceCount);
-            end;
-
-            vDrawItemSplitCounts[i - vLineBegDItemNo] := vDItemSpaceCount;  // ¼ÇÂ¼µ±Ç°DItem·Ö¼¸·İ
-            vLineSpaceCount := vLineSpaceCount + vDItemSpaceCount;  // ¼ÇÂ¼ĞĞÄÚ×Ü¹²·Ö¼¸·İ
-            if vDItemSpaceCount > 0 then  // µ±Ç°DItemÓĞ·Öµ½¼ä¾à
-              Inc(vCountWillSplit);  // Ôö¼Ó·Öµ½¼ä¾àµÄDItemÊıÁ¿
-          end;
-
-          if vLineSpaceCount > 1 then  // ·İÊı´óÓÚ1
-          begin
-            viSplitW := ARemWidth div vLineSpaceCount;  // Ã¿Ò»·İµÄ´óĞ¡
-            vDItemSpaceCount := ARemWidth mod vLineSpaceCount;  // ÓàÊı£¬½èÓÃ±äÁ¿
-            if vDItemSpaceCount > vCountWillSplit then  // ÓàÊı´óÓÚĞĞÖĞ²ÎÓë·ÖµÄDItemµÄÊıÁ¿
-            begin
-              vExtraW := vDItemSpaceCount div vCountWillSplit;  // ²ÎÓë·ÖµÄÃ¿Ò»¸öDItem¶îÍâÔÙ·ÖµÄÁ¿
-              vModWidth := vDItemSpaceCount mod vCountWillSplit;  // ¶îÍâ·ÖÍêºóÊ£Óà(Ğ¡ÓÚĞĞ²ÎÓë·ÖDItem¸öÊı)
-            end
-            else  // ÓàÊıĞ¡ÓÚĞĞÖĞ²ÎÓë·ÖµÄDItemÊıÁ¿
-              vModWidth := vDItemSpaceCount;
-          end;
-
-          { ĞĞÖĞµÚÒ»¸öDItemÔö¼ÓµÄ¿Õ¼ä }
-          if vDrawItemSplitCounts[0] > 0 then
-          begin
-            FDrawItems[vLineBegDItemNo].Rect.Right := FDrawItems[vLineBegDItemNo].Rect.Right
-              + vDrawItemSplitCounts[0] * viSplitW + vExtraW;
-            if vModWidth > 0 then  // ¶îÍâµÄÃ»ÓĞ·ÖÍê
-            begin
-              Inc(FDrawItems[vLineBegDItemNo].Rect.Right);  // µ±Ç°DItem¶à·ÖÒ»¸öÏñËØ
-              Dec(vModWidth);  // ¶îÍâµÄ¼õÉÙÒ»¸öÏñËØ
-            end;
-          end;
-
-          for i := vLineBegDItemNo + 1 to ALineEndDItemNo do  // ÒÔµÚÒ»¸öÎª»ù×¼£¬ÆäÓà¸÷DItemÔö¼ÓµÄ¿Õ¼ä
-          begin
-            vW := FDrawItems[i].Width;  // DrawItemÔ­À´Width
-            if vDrawItemSplitCounts[i - vLineBegDItemNo] > 0 then  // ÓĞ·Öµ½¼ä¾à
-            begin
-              vDWidth := vDrawItemSplitCounts[i - vLineBegDItemNo] * viSplitW + vExtraW;  // ¶à·Öµ½µÄwidth
-              if vModWidth > 0 then  // ¶îÍâµÄÃ»ÓĞ·ÖÍê
-              begin
-                if GetDrawItemStyle(i) < THCStyle.RsNull then
-                begin
-                  if (FItems[FDrawItems[i].ItemNo] as THCCustomRectItem).JustifySplit then
-                  begin
-                    Inc(vDWidth);  // µ±Ç°DItem¶à·ÖÒ»¸öÏñËØ
-                    Dec(vModWidth);  // ¶îÍâµÄ¼õÉÙÒ»¸öÏñËØ
-                  end;
-                end
-                else
-                begin
-                  Inc(vDWidth);  // µ±Ç°DItem¶à·ÖÒ»¸öÏñËØ
-                  Dec(vModWidth);  // ¶îÍâµÄ¼õÉÙÒ»¸öÏñËØ
-                end;
-              end;
-            end
-            else  // Ã»ÓĞ·Öµ½¼ä¾à
-              vDWidth := 0;
-
-            FDrawItems[i].Rect.Left := FDrawItems[i - 1].Rect.Right;
-
-            if GetDrawItemStyle(i) < THCStyle.RsNull then  // RectItem
-            begin
-              if (FItems[FDrawItems[i].ItemNo] as THCCustomRectItem).JustifySplit then  // ·ÖÉ¢¶ÔÆëÕ¼¼ä¾à
-                FDrawItems[i].Rect.Right := FDrawItems[i].Rect.Left + vW + vDWidth
-              else
-                FDrawItems[i].Rect.Right := FDrawItems[i].Rect.Left + vW;
-            end
-            else  // TextItem
-              FDrawItems[i].Rect.Right := FDrawItems[i].Rect.Left + vW + vDWidth;
-          end;
-        end;
-    end;
-  end;
-  {$ENDREGION}
-
-  {$REGION 'NewDrawItem'}
-  procedure NewDrawItem(const AItemNo, AOffs, ACharLen: Integer;
-    const ARect: TRect; const AParaFirst, ALineFirst: Boolean);
-  var
-    vDItem: THCCustomDrawItem;
-  begin
-    vDItem := THCCustomDrawItem.Create;
-    vDItem.ItemNo := AItemNo;
-    vDItem.CharOffs := AOffs;
-    vDItem.CharLen := ACharLen;
-    vDItem.ParaFirst := AParaFirst;
-    vDItem.LineFirst := ALineFirst;
-    vDItem.Rect := ARect;
-    Inc(ALastDNo);
-    FDrawItems.Insert(ALastDNo, vDItem);
-    if AOffs = 1 then
-      FItems[AItemNo].FirstDItemNo := ALastDNo;
-  end;
-  {$ENDREGION}
-
-  {$REGION 'FindLineBreak'}
-  /// <summary>
-  /// »ñÈ¡×Ö·û´®ÅÅ°æÊ±½Ø¶Ïµ½ÏÂÒ»ĞĞµÄÎ»ÖÃ
-  /// </summary>
-  /// <param name="AText"></param>
-  /// <param name="APos">ÔÚµÚX¸öºóÃæ¶Ï¿ª X > 0</param>
-  procedure FindLineBreak(const AText: string; var APos: Integer);
-
-    {$REGION 'GetCharType »ñÈ¡×Ö·ûÀàĞÍ'}
-    function GetCharType(const AChar: Word): TCharType;
-    begin
-      case AChar of
-        $4E00..$9FA5: Result := jctHZ;  // ºº×Ö
-
-        $21..$2F, $3A..$40, $5B..$60, $7B..$7E: Result := jctFH;  // !"#$%&'()*+,-./   :;<=>?@   [\]^_`   {|}~
-
-        $30..$39: Result := jctSZ;  // 0..9
-
-        $41..$5A, $61..$7A: Result := jctZM;  // A..Z, a..z
-      else
-        Result := jctBreak;
-      end;
-    end;
-    {$ENDREGION}
-
-    {$REGION 'GetBreak »ñÈ¡Ö¸¶¨×Ö·ûµÄ½Ø¶ÏÎ»ÖÃ'}
-    procedure GetBreak(const AText: string; var APos: Integer);
-    var
-      vChar: Char;
-    begin
-      vChar := AText[APos + 1];  // ÒòÎªÊÇÒª´¦Àí½Ø¶Ï£¬ËùÒÔAPos¿Ï¶¨ÊÇĞ¡ÓÚLength(AText)µÄ£¬²»ÓÃ¿¼ÂÇÔ½½ç
-      if PosCharHC(vChar, DontLineFirstChar) > 0 then  // ÏÂÒ»¸öÊÇ²»ÄÜ·ÅÔÚĞĞÊ×µÄ×Ö·û
-      begin
-        Dec(APos);  // µ±Ç°ÒªÒÆ¶¯µ½ÏÂÒ»ĞĞ£¬ÍùÇ°Ò»¸ö½Ø¶ÏÖØĞÂÅĞ¶Ï
-        GetBreak(AText, APos);
-      end
-      else  // ÏÂÒ»¸ö¿ÉÒÔ·ÅÔÚĞĞÊ×£¬µ±Ç°Î»ÖÃÄÜ·ñ·ÅÖÃµ½ĞĞÎ²
-      begin
-        vChar := AText[APos];  // µ±Ç°Î»ÖÃ×Ö·û
-        if PosCharHC(vChar, DontLineLastChar) > 0 then  // ÊÇ²»ÄÜ·ÅÔÚĞĞÎ²µÄ×Ö·û
-        begin
-          Dec(APos);  // ÔÙÍùÇ°Ñ°ÕÒ½Ø¶ÏÎ»ÖÃ
-          GetBreak(AText, APos);
-        end;
-      end;
-    end;
-    {$ENDREGION}
-
-    function MatchBreak(const APrevType, APosType: TCharType): TBreakPosition;
-    begin
-      Result := jbpNone;
-      case APosType of
-        jctHZ:
-          begin
-            if APrevType = jctHZ then  // µ±Ç°Î»ÖÃÊÇºº×Ö£¬Ç°Ò»¸öÒ²ÊÇºº×Ö
-              Result := jbpPrev;
-          end;
-
-        jctZM:
-          begin
-            if not (APrevType in [jctZM, jctSZ]) then  // µ±Ç°ÊÇ×ÖÄ¸£¬Ç°Ò»¸öÊÇÊı×Ö¡¢×ÖÄ¸
-              Result := jbpPrev;
-          end;
-
-        jctSZ:
-          begin
-            if not (APrevType in [jctZM, jctSZ]) then  // µ±Ç°ÊÇÊı×Ö£¬Ç°Ò»¸öÊÇ×ÖÄ¸¡¢Êı×Ö
-              Result := jbpPrev;
-          end;
-
-        jctFH:
-          begin
-            if APrevType <> jctFH then  // µ±Ç°ÊÇ·ûºÅ£¬Ç°Ò»¸öÒ²ÊÇ·ûºÅ
-              Result := jbpPrev;
-          end;
-      end;
-    end;
-
-  var
-    i: Integer;
-    vPosType, vPrevType: TCharType;
-  begin
-    GetBreak(AText, APos);
-
-    vPosType := GetCharType(Word(AText[APos]));
-    if vPosType <> jctBreak then
-    begin
-      for i := APos - 1 downto 1 do
-      begin
-        vPrevType := GetCharType(Word(AText[i]));
-        case MatchBreak(vPrevType, vPosType) of
-          jbpPrev:
-            begin
-              APos := i;
-              Break;
-            end;
-
-          {jbpCur:  // Èç¹û²»ĞèÒª´ËÔªËØ£¬¿É½«case¸ÄÎªif
-            begin
-              APos := i + 1;
-              Break;
-            end;}
-        end;
-        vPosType := vPrevType;
-      end;
-    end;
-  end;
-  {$ENDREGION}
-
-var
-  vStr: string;
-  vRect: TRect;
-  vSize: TSize;
-  vWidth,  // µ±Ç°Ò³ÃæÊ£Óà¿É·ÅÖÃ¿í¶È
-  vItemHeight,  // µ±Ç°Item¸ß¶È
-  viLen, // TextItemµ±Ç°ĞĞ¸ñÊ½»¯°²ÖÃµ½µÄ×Ö·û³¤¶È£¬½Ø¶ÏÎ»ÖÃ
-  viCutPos,  // ÓÃÓÚ¼ÇÂ¼viLen´¦ÀíÇ°µÄ½Ø¶ÏÎ»ÖÃ
-  vRemainderWidth
-    : Integer;
-  vItem: THCCustomItem;
-  vRectItem: THCCustomRectItem;
-  vParaStyle: TParaStyle;
-  vParaFirst, vLineFirst: Boolean;
-  //vFirstNullItem: Boolean;
+function THCCustomData.GetUndoList: THCUndoList;
 begin
-  if not FItems[AItemNo].Visible then Exit;
-
-  viLen := 0;
-  vRemainderWidth := 0;
-  vItem := FItems[AItemNo];
-  vParaStyle := FStyle.ParaStyles[vItem.ParaNo];
-  if (AOffs = 1) and vItem.ParaFirst then  // µÚÒ»´Î´¦Àí¶ÎµÚÒ»¸öItem
-  begin
-    vParaFirst := True;
-    vLineFirst := True;
-  end
-  else  // ·Ç¶ÎµÚ1¸ö
-  begin
-    vParaFirst := False;
-
-    if (ALastDNo >= 0)
-      and (FItems[FDrawItems[ALastDNo].ItemNo].StyleNo < THCStyle.RsNull)
-      and ((FItems[FDrawItems[ALastDNo].ItemNo] as THCCustomRectItem).Width = 0)
-      and FDrawItems[ALastDNo].LineFirst
-    then  // Îª¼æÈİ¿í¶ÈÎª0µÄRectItem£¬ÈçÊı¾İ×é¡¢·ÖÒ³·û
-      vLineFirst := False
-    else
-      vLineFirst := APos.X = 0;
-  end;
-
-  if vItem.StyleNo < THCStyle.RsNull then  // ÊÇRectItem
-  begin
-    viLen := 1;
-    vRectItem := vItem as THCCustomRectItem;
-    vRectItem.FormatToDrawItem(FStyle);
-    vWidth := AContentWidth - APos.X;
-    if (vRectItem.Width > vWidth) and (not vLineFirst) then  // µ±Ç°ĞĞÊ£Óà¿í¶È·Å²»ÏÂ
-    begin
-      // Æ«ÒÆµ½ÏÂÒ»ĞĞ
-      FinishLine(ALastDNo, vWidth);
-      APos.X := 0;
-      APos.Y := FDrawItems[ALastDNo].Rect.Bottom;
-      _FormatItemToDrawItems(AItemNo, AOffs, AContentWidth, APos, ALastDNo);  // ¼ÌĞø·ÅÈëÃ»·ÅÍêµÄ
-      Exit;
-    end
-    else  // µ±Ç°ĞĞ¿ÕÓà¿í¶ÈÄÜ·ÅÏÂ
-    begin
-      vRect.Left := APos.X;
-      vRect.Top := APos.Y;
-      vRect.Right := vRect.Left + vRectItem.Width;
-      vRect.Bottom := vRect.Top + vRectItem.Height + vParaStyle.LineSpace;
-      NewDrawItem(AItemNo, AOffs, viLen, vRect, vParaFirst, vLineFirst);
-      vRemainderWidth := AContentWidth - vRect.Right;
-    end;
-  end
-  else  // ÎÄ±¾
-  begin
-    FStyle.TextStyles[vItem.StyleNo].ApplyStyle(FStyle.DefCanvas);
-    vItemHeight := FStyle.DefCanvas.TextHeight('×Ö') + vParaStyle.LineSpace;  // ĞĞ¸ß
-    vStr := Copy(vItem.Text, AOffs, Length(vItem.Text));  // ´ÓAOffsÍùºóµÄËùÓĞ×Ö·û´®
-    if vStr = '' then  // ¿Õitem(¿Ï¶¨ÊÇ¿ÕĞĞ)
-    begin
-      Assert(vItem.ParaFirst, 'ÎÄ±¾ItemµÄÄÚÈİ³öÏÖÎª¿ÕµÄÇé¿ö£¡');
-      vRemainderWidth := AContentWidth - APos.X;
-      vRect.Left := APos.X;
-      vRect.Top := APos.Y;
-      vRect.Right := 0;
-      vRect.Bottom := vRect.Top + vItemHeight;  //DefaultCaretHeight;
-      vParaFirst := True;
-      vLineFirst := True;
-      NewDrawItem(AItemNo, AOffs, viLen, vRect, vParaFirst, vLineFirst);
-    end
-    else  // ·Ç¿ÕĞĞ£¬ÓĞÎÄ±¾ÄÚÈİ
-    begin
-      vSize := FStyle.DefCanvas.TextExtent(vStr);  // ²âÁ¿×Ö·û´®´óĞ¡
-      vRect.Left := APos.X;
-      vRect.Top := APos.Y;
-      // ¸³³õÊ¼Öµ£¬·ñÔòµ÷ÓÃMeasureTextÎŞĞ§
-      vWidth := AContentWidth - APos.X;
-      if vSize.cx > vWidth then  // µ±Ç°ĞĞ·Å²»ÏÂµ±Ç°TextItemÃ»ÓĞ°²ÖÃµÄÈ«²¿×Ö·û
-      begin
-        if vWidth > 0 then  // ÓĞ¿ÕÓàÎ»ÖÃ
-          viLen := GetTextPlace(vWidth, vStr);  // µÃµ½ÄÜ·ÅÏÂµÄÎ»ÖÃ
-
-        if viLen = 0 then  // µ±Ç°ĞĞÊ£ÓàÁ¬Ò»¸ö×Ö·ûÒ²·Å²»ÏÂ  ºÍ 201804202355 Ò»Ñù
-        begin
-          FinishLine(ALastDNo, vWidth);
-          // Æ«ÒÆµ½ÏÂÒ»ĞĞ
-          APos.X := 0;
-          APos.Y := FDrawItems[ALastDNo].Rect.Bottom;
-          _FormatItemToDrawItems(AItemNo, AOffs + viLen, AContentWidth, APos, ALastDNo);  // ¼ÌĞø·ÅÈëÃ»·ÅÍêµÄ
-          Exit;
-        end
-        else  // µ±Ç°ĞĞÄÜ·ÅÏÂµ±Ç°ItemµÄÒ»²¿·Ö
-        begin
-          viCutPos := viLen;
-          FindLineBreak(vStr, viLen);  // ÕÒ½Ø¶ÏÎ»ÖÃ
-
-          if viLen > 0 then  // ½Ø¶ÏÎ»ÖÃ´óÓÚ0
-          begin
-            vStr := Copy(vStr, 1, viLen);  // Item.Text´ÓAOffs¿ªÊ¼ÄÜ·ÅÏÂµÄ×Ö·û´®
-            vSize := FStyle.DefCanvas.TextExtent(vStr);
-          end
-          else  // ÕÒ²»µ½½Ø¶ÏÎ»ÖÃ£¬¾ÍÔÚÔ­Î»ÖÃ½Ø¶Ï
-            viLen := viCutPos;
-
-            vRemainderWidth := vWidth - vSize.cx;  // ·ÅÈë×î¶àºóµÄÊ£ÓàÁ¿
-            vRect.Right := vRect.Left + vSize.cx;  // Ê¹ÓÃ×Ô¶¨Òå²âÁ¿µÄ½á¹û
-            vRect.Bottom := vRect.Top + vItemHeight;
-            NewDrawItem(AItemNo, AOffs, viLen, vRect, vParaFirst, vLineFirst);
-            FinishLine(ALastDNo, vRemainderWidth);
-            // Æ«ÒÆµ½ÏÂÒ»ĞĞ¶¥¶Ë£¬×¼±¸ÁíÆğÒ»ĞĞ
-            APos.X := 0;
-            APos.Y := FDrawItems[ALastDNo].Rect.Bottom;  // ²»Ê¹ÓÃ vRect.Bottom ÒòÎªÈç¹ûĞĞÖĞ¼äÓĞ¸ßµÄ£¬»áĞŞÕıÆäbottom
-            _FormatItemToDrawItems(AItemNo, AOffs + viLen, AContentWidth, APos, ALastDNo);  // ¼ÌĞø·ÅÈëÃ»·ÅÍêµÄ
-          {end
-          else  // ½Ø¶ÏÎ»ÖÃÎª0(ËµÃ÷ÎŞ·¨½Ø¶Ï£¬µ±Ç°ĞèÒªÕûÌåÏÂÒÆ) ºÍ 201804202355 Ò»Ñù
-          begin
-            FinishLine(ALastDNo, vWidth);
-            // Æ«ÒÆµ½ÏÂÒ»ĞĞ
-            APos.X := 0;
-            APos.Y := FDrawItems[ALastDNo].Rect.Bottom;
-            _FormatItemToDrawItems(AItemNo, AOffs + viLen, AContentWidth, APos, ALastDNo);  // ¼ÌĞø·ÅÈëÃ»·ÅÍêµÄ
-          end;}
-
-          Exit;
-        end;
-      end
-      else  // µ±Ç°ĞĞÄÜ·ÅÏÂµ±Ç°TextItemÃ»°²ÖÃµÄÈ«²¿×Ö·û
-      begin
-        viLen := vItem.Length;
-        vRemainderWidth := vWidth - vSize.cx;  // ·ÅÈë×î¶àºóµÄÊ£ÓàÁ¿
-        vRect.Right := vRect.Left + vSize.cx;  // Ê¹ÓÃ×Ô¶¨Òå²âÁ¿µÄ½á¹û
-        vRect.Bottom := vRect.Top + vItemHeight;
-        NewDrawItem(AItemNo, AOffs, Length(vStr), vRect, vParaFirst, vLineFirst);
-      end;
-    end;
-  end;
-  // ¼ÆËãÏÂÒ»¸öµÄÎ»ÖÃ
-  if AItemNo = FItems.Count - 1 then  // ÊÇ×îºóÒ»¸ö
-    FinishLine(ALastDNo, vRemainderWidth)
-  else  // ²»ÊÇ×îºóÒ»¸ö£¬ÔòÎªÏÂÒ»¸öItem×¼±¸Î»ÖÃ
-  begin
-    if (viLen = vItem.Length) and FItems[AItemNo + 1].ParaFirst then // µ±Ç°Item´¦ÀíÍêÁËÇÒÏÂÒ»¸öÊÇ¶ÎÆğÊ¼
-    begin
-      FinishLine(ALastDNo, vRemainderWidth);
-      // Æ«ÒÆµ½ÏÂÒ»ĞĞ¶¥¶Ë£¬×¼±¸ÁíÆğÒ»ĞĞ
-      APos.X := 0;
-      APos.Y := FDrawItems[ALastDNo].Rect.Bottom;  // ²»Ê¹ÓÃ vRect.Bottom ÒòÎªÈç¹ûĞĞÖĞ¼äÓĞ¸ßµÄ£¬»áĞŞÕıÆäbottom
-    end
-    else  // µ±Ç°ItemÃ»ÓĞ´¦ÀíÍê»òÏÂÒ»¸ö²»ÊÇ¶ÎÆğÊ¼
-      APos.X := vRect.Right;  // ÏÂÒ»¸öµÄÆğÊ¼×ø±ê
-  end;
+  if Assigned(FOnGetUndoList) then
+    Result := FOnGetUndoList
+  else
+    Result := nil;
 end;
 
 function THCCustomData.IsLineLastDrawItem(const ADrawItemNo: Integer): Boolean;
 begin
-  // ²»ÄÜÔÚ¸ñÊ½»¯½øĞĞÖĞÊ¹ÓÃ£¬ÒòÎªDrawItems.Count¿ÉÄÜÖ»ÊÇµ±Ç°¸ñÊ½»¯µ½µÄItem
+  // ä¸èƒ½åœ¨æ ¼å¼åŒ–è¿›è¡Œä¸­ä½¿ç”¨ï¼Œå› ä¸ºDrawItems.Countå¯èƒ½åªæ˜¯å½“å‰æ ¼å¼åŒ–åˆ°çš„Item
   Result := (ADrawItemNo = FDrawItems.Count - 1) or (FDrawItems[ADrawItemNo + 1].LineFirst);
   {(ADItemNo < FDrawItems.Count - 1) and (not FDrawItems[ADItemNo + 1].LineFirst)}
 end;
@@ -1982,14 +1609,14 @@ var
 begin
   Result := False;
   vItemNo := FDrawItems[ADrawItemNo].ItemNo;
-  if vItemNo < FItems.Count - 1 then  // ²»ÊÇ×îºóÒ»¸öItem
+  if vItemNo < FItems.Count - 1 then  // ä¸æ˜¯æœ€åä¸€ä¸ªItem
   begin
-    if FItems[vItemNo + 1].ParaFirst then  // ÏÂÒ»¸öÊÇ¶ÎÊ×
-      Result := FDrawItems[ADrawItemNo].CharOffsetEnd = FItems[vItemNo].Length;  // ÊÇItem×îºóÒ»¸öDrawItem
+    if FItems[vItemNo + 1].ParaFirst then  // ä¸‹ä¸€ä¸ªæ˜¯æ®µé¦–
+      Result := FDrawItems[ADrawItemNo].CharOffsetEnd = FItems[vItemNo].Length;  // æ˜¯Itemæœ€åä¸€ä¸ªDrawItem
   end
-  else  // ÊÇ×îºóÒ»¸öItem
-    Result := FDrawItems[ADrawItemNo].CharOffsetEnd = FItems[vItemNo].Length;  // ÊÇItem×îºóÒ»¸öDrawItem
-  // ²»ÄÜÓÃÏÂÃæÕâÑùµÄÅĞ¶Ï£¬ÒòÎªÕıÔÚ¸ñÊ½»¯½øĞĞÊ±£¬µ±Ç°¿Ï¶¨ÊÇDrawItemsµÄ×îºóÒ»¸ö
+  else  // æ˜¯æœ€åä¸€ä¸ªItem
+    Result := FDrawItems[ADrawItemNo].CharOffsetEnd = FItems[vItemNo].Length;  // æ˜¯Itemæœ€åä¸€ä¸ªDrawItem
+  // ä¸èƒ½ç”¨ä¸‹é¢è¿™æ ·çš„åˆ¤æ–­ï¼Œå› ä¸ºæ­£åœ¨æ ¼å¼åŒ–è¿›è¡Œæ—¶ï¼Œå½“å‰è‚¯å®šæ˜¯DrawItemsçš„æœ€åä¸€ä¸ª
   //Result :=(ADItemNo = FDrawItems.Count - 1) or (FDrawItems[ADItemNo + 1].ParaFirst);
 end;
 
@@ -2012,18 +1639,18 @@ begin
   for i := 0 to FItems.Count - 1 do
   begin
     vItem := FItems[i];
-    if AMark then  // ±ê¼Ç
+    if AMark then  // æ ‡è®°
     begin
       FStyle.ParaStyles[vItem.ParaNo].CheckSaveUsed := True;
-      if vItem.StyleNo < THCStyle.RsNull then
+      if vItem.StyleNo < THCStyle.Null then
         (vItem as THCCustomRectItem).MarkStyleUsed(AMark)
       else
         FStyle.TextStyles[vItem.StyleNo].CheckSaveUsed := True;
     end
-    else  // ÖØĞÂ¸³Öµ
+    else  // é‡æ–°èµ‹å€¼
     begin
       vItem.ParaNo := FStyle.ParaStyles[vItem.ParaNo].TempNo;
-      if vItem.StyleNo < THCStyle.RsNull then
+      if vItem.StyleNo < THCStyle.Null then
         (vItem as THCCustomRectItem).MarkStyleUsed(AMark)
       else
         vItem.StyleNo := FStyle.TextStyles[vItem.StyleNo].TempNo;
@@ -2033,17 +1660,17 @@ end;
 
 procedure THCCustomData.MatchItemSelectState;
 
-  {$REGION '¼ì²âÄ³¸öItemµÄÑ¡ÖĞ×´Ì¬'}
+  {$REGION ' CheckItemSelectedStateæ£€æµ‹æŸä¸ªItemçš„é€‰ä¸­çŠ¶æ€ '}
   procedure CheckItemSelectedState(const AItemNo: Integer);
   begin
-    if (AItemNo > SelectInfo.StartItemNo) and (AItemNo < SelectInfo.EndItemNo) then  // ÔÚÑ¡ÖĞ·¶Î§Ö®¼ä
+    if (AItemNo > SelectInfo.StartItemNo) and (AItemNo < SelectInfo.EndItemNo) then  // åœ¨é€‰ä¸­èŒƒå›´ä¹‹é—´
       Items[AItemNo].SelectComplate
     else
-    if AItemNo = SelectInfo.StartItemNo then  // Ñ¡ÖĞÆğÊ¼
+    if AItemNo = SelectInfo.StartItemNo then  // é€‰ä¸­èµ·å§‹
     begin
-      if AItemNo = SelectInfo.EndItemNo then  // Ñ¡ÖĞÔÚÍ¬Ò»¸öItem
+      if AItemNo = SelectInfo.EndItemNo then  // é€‰ä¸­åœ¨åŒä¸€ä¸ªItem
       begin
-        if Items[AItemNo].StyleNo < THCStyle.RsNull then  // RectItem
+        if Items[AItemNo].StyleNo < THCStyle.Null then  // RectItem
         begin
           if (SelectInfo.StartItemOffset = OffsetInner)
             or (SelectInfo.EndItemOffset = OffsetInner)
@@ -2062,7 +1689,7 @@ procedure THCCustomData.MatchItemSelectState;
             Items[AItemNo].SelectPart;
         end;
       end
-      else  // Ñ¡ÖĞÔÚ²»Í¬µÄItem£¬µ±Ç°ÊÇÆğÊ¼
+      else  // é€‰ä¸­åœ¨ä¸åŒçš„Itemï¼Œå½“å‰æ˜¯èµ·å§‹
       begin
         if SelectInfo.StartItemOffset = 0 then
           Items[AItemNo].SelectComplate
@@ -2070,9 +1697,9 @@ procedure THCCustomData.MatchItemSelectState;
           Items[AItemNo].SelectPart;
       end;
     end
-    else  // Ñ¡ÖĞÔÚ²»Í¬µÄItem£¬µ±Ç°ÊÇ½áÎ² if AItemNo = SelectInfo.EndItemNo) then
+    else  // é€‰ä¸­åœ¨ä¸åŒçš„Itemï¼Œå½“å‰æ˜¯ç»“å°¾ if AItemNo = SelectInfo.EndItemNo) then
     begin
-      if Items[AItemNo].StyleNo < THCStyle.RsNull then  // RectItem
+      if Items[AItemNo].StyleNo < THCStyle.Null then  // RectItem
       begin
         if SelectInfo.EndItemOffset = OffsetAfter then
           Items[AItemNo].SelectComplate
@@ -2087,37 +1714,6 @@ procedure THCCustomData.MatchItemSelectState;
           Items[AItemNo].SelectPart;
       end;
     end;
-    {
-    //////////////////////////////////////////////////////
-    if (AItemNo = SelectInfo.StartItemNo) and (SelectInfo.StartItemOffset = 0) then
-    begin
-      if SelectInfo.StartItemNo = SelectInfo.EndItemNo then
-      begin
-        if Items[SelectInfo.EndItemNo].StyleNo < THCStyle.RsNull then
-          Result := SelectInfo.EndItemOffset = OffsetAfter
-        else
-          Result := SelectInfo.EndItemOffset = Items[SelectInfo.EndItemNo].Length;
-      end
-      else
-        Result := SelectInfo.StartItemNo < SelectInfo.EndItemNo;
-    end
-    else
-    if AItemNo = SelectInfo.EndItemNo then
-    begin
-      if Items[AItemNo].StyleNo < THCStyle.RsNull then
-        Result := SelectInfo.EndItemOffset = OffsetAfter
-      else
-        Result := SelectInfo.EndItemOffset = Items[SelectInfo.EndItemNo].Length;
-      if Result then
-      begin
-        if SelectInfo.StartItemNo = SelectInfo.EndItemNo then
-          Result := SelectInfo.StartItemOffset = 0
-        else
-          Result := SelectInfo.StartItemNo < SelectInfo.EndItemNo;
-      end;
-    end
-    else
-      Result := (SelectInfo.StartItemNo < AItemNo) and (AItemNo < SelectInfo.EndItemNo);}
   end;
   {$ENDREGION}
 
@@ -2126,7 +1722,7 @@ var
 begin
   if SelectExists then
   begin
-    for i := SelectInfo.StartItemNo to SelectInfo.EndItemNo do  // ÆğÊ¼½áÊøÖ®¼äµÄ°´È«Ñ¡ÖĞ´¦Àí
+    for i := SelectInfo.StartItemNo to SelectInfo.EndItemNo do  // èµ·å§‹ç»“æŸä¹‹é—´çš„æŒ‰å…¨é€‰ä¸­å¤„ç†
       CheckItemSelectedState(i);
   end;
 end;
@@ -2136,7 +1732,7 @@ begin
   Result := False;
   if (AItemNo < 0) or (AOffset < 0) then Exit;
 
-  if FItems[AItemNo].StyleNo < THCStyle.RsNull then // ·ÇÎÄ±¾´ÖÂÔÅĞ¶Ï£¬ÈçĞèÒª¾«È·ÓÃCoordInSelect¼ä½Óµ÷ÓÃ
+  if FItems[AItemNo].StyleNo < THCStyle.Null then // éæ–‡æœ¬ç²—ç•¥åˆ¤æ–­ï¼Œå¦‚éœ€è¦ç²¾ç¡®ç”¨CoordInSelecté—´æ¥è°ƒç”¨
   begin
     if (AOffset = OffsetInner) and FItems[AItemNo].IsSelectComplate then
       Result := True;
@@ -2162,14 +1758,13 @@ begin
   end;
 end;
 
-procedure THCCustomData.PaintData(const ADataDrawLeft, ADataDrawTop, ADataDrawBottom,
-  ADataScreenTop, ADataScreenBottom, AVOffset: Integer;
-  const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
+procedure THCCustomData.PaintData(const ADataDrawLeft, ADataDrawTop,
+  ADataDrawBottom, ADataScreenTop, ADataScreenBottom, AVOffset, AFristDItemNo,
+  ALastDItemNo: Integer; const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 var
-  vFristDItemNo, vLastDItemNo: Integer;
-  vAlignVert: Integer;
+  vTextDrawTop: Integer;
 
-  {$REGION 'µ±Ç°ÏÔÊ¾·¶Î§ÄÚÒª»æÖÆµÄDrawItemÈ«²¿ÊÇÑ¡ÖĞµÄ'}
+  {$REGION ' å½“å‰æ˜¾ç¤ºèŒƒå›´å†…è¦ç»˜åˆ¶çš„DrawItemæ˜¯å¦å…¨é€‰ '}
   function DrawItemSelectAll: Boolean;
   var
     vSelStartDItemNo, vSelEndDItemNo: Integer;
@@ -2177,22 +1772,22 @@ var
     vSelStartDItemNo := GetSelectStartDrawItemNo;
     vSelEndDItemNo := GetSelectEndDrawItemNo;
 
-    Result :=  // µ±Ç°Ò³ÊÇ·ñÈ«Ñ¡ÖĞÁË
+    Result :=  // å½“å‰é¡µæ˜¯å¦å…¨é€‰ä¸­äº†
       (
-        (vSelStartDItemNo < vFristDItemNo)
+        (vSelStartDItemNo < AFristDItemNo)
         or
         (
-          (vSelStartDItemNo = vFristDItemNo)
+          (vSelStartDItemNo = AFristDItemNo)
           and
           (SelectInfo.StartItemOffset = FDrawItems[vSelStartDItemNo].CharOffs)
         )
       )
       and
       (
-        (vSelEndDItemNo > vLastDItemNo)
+        (vSelEndDItemNo > ALastDItemNo)
         or
         (
-          (vSelEndDItemNo = vLastDItemNo)
+          (vSelEndDItemNo = ALastDItemNo)
           and
           (SelectInfo.EndItemOffset = FDrawItems[vSelEndDItemNo].CharOffs + FDrawItems[vSelEndDItemNo].CharLen)
         )
@@ -2200,42 +1795,57 @@ var
   end;
   {$ENDREGION}
 
-  {$REGION 'DrawTextJsutify 20170220001 ·ÖÉ¢¶ÔÆëÏà¹Ø´¦Àí'}
+  {$REGION ' DrawTextJsutify 20170220001 åˆ†æ•£å¯¹é½ç›¸å…³å¤„ç† '}
   procedure DrawTextJsutify(const ARect: TRect; const AText: string; const ALineLast: Boolean);
   var
-    vSplitCount, vX, viSplitW, vMod: Integer;
-    vSplitList: THCList;
-    i: Integer;
+    i, vSplitCount, vX, vLen, viSplitW, vMod: Integer;
+    vSplitList: THCIntegerList;
     vS: string;
-    vRect: TRect;
+    vPos: array[0..0] of Integer;
   begin
     vMod := 0;
     vX := ARect.Left;
-    viSplitW := (ARect.Right - ARect.Left) - FStyle.DefCanvas.TextWidth(AText);
-    // ¼ÆËãµ±Ç°DitemÄÚÈİ·Ö³É¼¸·İ£¬Ã¿Ò»·İÔÚÄÚÈİÖĞµÄÆğÊ¼Î»ÖÃ
-    vSplitList := THCList.Create;
+    viSplitW := (ARect.Right - ARect.Left) - FStyle.TempCanvas.TextWidth(AText);
+    // è®¡ç®—å½“å‰Ditemå†…å®¹åˆ†æˆå‡ ä»½ï¼Œæ¯ä¸€ä»½åœ¨å†…å®¹ä¸­çš„èµ·å§‹ä½ç½®
+    vSplitList := THCIntegerList.Create;
     try
       vSplitCount := GetJustifyCount(AText, vSplitList);
-      if ALineLast and (vSplitCount > 0) then  // ĞĞ×îºóDItem£¬ÉÙ·ÖÒ»¸ö
+      if ALineLast and (vSplitCount > 0) then  // è¡Œæœ€åDrawItemï¼Œå°‘åˆ†ä¸€ä¸ª
         Dec(vSplitCount);
-      if vSplitCount > 0 then  // ÓĞ·Öµ½¼ä¾à
+
+      if vSplitCount > 0 then  // æœ‰åˆ†åˆ°é—´è·
       begin
         vMod := viSplitW mod vSplitCount;
         viSplitW := viSplitW div vSplitCount;
       end;
 
-      for i := 0 to vSplitList.Count - 2 do  // vSplitList×îºóÒ»¸öÊÇ×Ö·û´®³¤¶ÈËùÒÔ¶à¼õ1
+      for i := 0 to vSplitList.Count - 2 do  // vSplitListæœ€åä¸€ä¸ªæ˜¯å­—ç¬¦ä¸²é•¿åº¦æ‰€ä»¥å¤šå‡1
       begin
-        vS := Copy(AText, vSplitList[i], vSplitList[i + 1] - vSplitList[i]);
-        //ACanvas.TextOut(vX, ARect.Top, vS);
-        vRect := Rect(vX, ARect.Top, ARect.Right, ARect.Bottom);
-        Windows.DrawText(ACanvas.Handle, vS, -1, vRect, DT_LEFT or DT_SINGLELINE or vAlignVert);
-        vX := vX + FStyle.DefCanvas.TextWidth(vS) + viSplitW;
+        vLen := vSplitList[i + 1] - vSplitList[i];
+        vS := Copy(AText, vSplitList[i], vLen);
+
+        if ALineLast and (i = vSplitList.Count - 2) then
+          vPos[0] := FStyle.TempCanvas.TextWidth(vS)
+        else
         if vMod > 0 then
         begin
-          Inc(vX);
+          vPos[0] := FStyle.TempCanvas.TextWidth(vS) + viSplitW + 1;
           Dec(vMod);
-        end;
+        end
+        else
+          vPos[0] := FStyle.TempCanvas.TextWidth(vS) + viSplitW;
+
+        //vRect := Rect(vX, vTextDrawTop, ARect.Right, ARect.Bottom);
+        //Windows.DrawText(ACanvas.Handle, vS, -1, vRect, DT_LEFT or DT_SINGLELINE or vAlignVert);
+        //ACanvas.TextOut(vX, vTextDrawTop, vS);
+        { 201805161718
+        ETO_CLIPPEDï¼šæ­£æ–‡å°†è£å‰ªåˆ°çŸ©å½¢ä¸­ã€‚
+        ETO_GLYPH_INDEXï¼šLpStringæŒ‡å‘ç”±GetCharacterPlacementè¿”å›çš„æ•°ç»„ï¼Œå¦‚æœæ²¡æœ‰è¿›ä¸€æ­¥çš„ç‰¹æ®Šè¯­è¨€å¤„ç†çš„è¦æ±‚ï¼Œåˆ™æ­¤æ•°ç»„ç›´æ¥ç”±GDIè§£æï¼Œä»…å¯¹å­—ä½“åº”ç”¨ç¬¦å·ç´¢å¼•ï¼Œä½†æ­¤æ ‡å¿—å¯ç”¨äºä½å›¾å’Œå‘é‡å­—ä½“ï¼Œä»¥è¡¨ç¤ºä¸å¿…åšè¿›ä¸€æ­¥çš„è¯­è¨€å¤„ç†ï¼ŒGDIåº”ç”¨ç›´æ¥å¤„ç†æ­¤å­—ç¬¦ä¸²ã€‚
+        ETO_OPAQUEï¼šç”¨å½“å‰çš„èƒŒæ™¯è‰²æ¥å¡«å……çŸ©å½¢ã€‚
+        ETO_RTLREADINGï¼šåœ¨Middle_Eastern Windowsä¸­å¦‚æœæŒ‡å®šäº†æ­¤å€¼ï¼Œä¸”Hebrewæˆ–Arabicå­—ä½“è¢«é€‰è¿›è®¾å¤‡ç¯å¢ƒï¼Œåˆ™æ­¤å­—ç¬¦ä¸²ç”¨ä»¥ä»å³åˆ°å·¦çš„é˜…è¯»é¡ºåºæ¥è¾“å‡ºã€‚å¦‚æœæ²¡æœ‰æŒ‡å®šæ­¤å€¼ï¼Œåˆ™å­—ç¬¦ä¸²ä»¥ä»å·¦åˆ°å³çš„é¡ºåºè¾“å‡ºã€‚åœ¨SetTextAlignä¸­è®¾ç½®TA_RTLREADINGå€¼å¯è·å¾—åŒæ ·çš„æ•ˆæœã€‚ä¸ºå‘åå…¼å®¹ï¼Œæ­¤å€¼ä½œä¸ºä¿ç•™å€¼ã€‚
+        ETO_GLYPH_INDEXå’ŒETO_RTLREADINGå€¼ä¸èƒ½åœ¨ä¸€èµ·ä½¿ç”¨ã€‚å› ä¸ºETO_GLYPH_INDEXè¡¨ç¤ºæ‰€æœ‰çš„è¯­è¨€å¤„ç†å·²ç»å®Œæˆï¼Œå‡½æ•°å°±ä¼šå¿½ç•¥è¢«æŒ‡å®šçš„ETO_RTLREADINGå€¼ã€‚}
+        Windows.ExtTextOut(ACanvas.Handle, vX, vTextDrawTop, 0, nil, PChar(vS), vLen, @vPos);
+        vX := vX + vPos[0];
       end;
     finally
       vSplitList.Free;
@@ -2243,254 +1853,351 @@ var
   end;
   {$ENDREGION}
 
-  {$REGION 'DrawLineLastMrak ¶ÎÎ²µÄ»»ĞĞ·û'}
-  procedure DrawLineLastMrak(const ADrawRect: TRect);
-  begin
-    ACanvas.Pen.Style := psSolid;
-    ACanvas.Pen.Color := clActiveBorder;
-    ACanvas.MoveTo(ADrawRect.Right + 4, ADrawRect.Bottom - 8);
-    ACanvas.LineTo(ADrawRect.Right + 6, ADrawRect.Bottom - 8);
-    ACanvas.LineTo(ADrawRect.Right + 6, ADrawRect.Bottom - 3);
-
-    ACanvas.MoveTo(ADrawRect.Right,     ADrawRect.Bottom - 3);
-    ACanvas.LineTo(ADrawRect.Right + 6, ADrawRect.Bottom - 3);
-
-    ACanvas.MoveTo(ADrawRect.Right + 1, ADrawRect.Bottom - 4);
-    ACanvas.LineTo(ADrawRect.Right + 1, ADrawRect.Bottom - 1);
-    ACanvas.MoveTo(ADrawRect.Right + 2, ADrawRect.Bottom - 5);
-    ACanvas.LineTo(ADrawRect.Right + 2, ADrawRect.Bottom);
-  end;
-  {$ENDREGION}
-
 var
   i, vSelStartDNo, vSelStartDOffs, vSelEndDNo, vSelEndDOffs,
-  vPrioStyleNo, vPrioParaNo, vVOffset, vTextHeight, vDrawTop: Integer;
+  vPrioStyleNo, vPrioParaNo, vVOffset, vTextHeight, vLineSpace: Integer;
   vItem: THCCustomItem;
-  vDItem: THCCustomDrawItem;
+  vRectItem: THCCustomRectItem;
+  vDrawItem: THCCustomDrawItem;
   vAlignHorz: TParaAlignHorz;
-  vDrawRect: TRect;
-  S: string;
-
-  vCharWidths: array of Integer;
-  j, vFit, vLen: Integer;
-  vSize: TSize;
+  vDrawRect, vClearRect: TRect;
+  vText: string;
+  vLen: Integer;
 
   vDrawsSelectAll: Boolean;
   vDCState: Integer;
 begin
-  if FItems.Count = 0 then Exit;
+  if (AFristDItemNo < 0) or (ALastDItemNo < 0) then Exit;
 
-  vVOffset := ADataDrawTop - AVOffset;  // ½«Êı¾İÆğÊ¼Î»ÖÃÓ³Éäµ½»æÖÆÎ»ÖÃ
+  if not APaintInfo.Print then  // éæ‰“å°æ—¶è·å–é€‰ä¸­ä¿¡æ¯
+  begin
+    vSelStartDNo := GetSelectStartDrawItemNo;  // é€‰ä¸­èµ·å§‹DrawItem
+    if vSelStartDNo < 0 then
+      vSelStartDOffs := -1
+    else
+      vSelStartDOffs := FSelectInfo.StartItemOffset - FDrawItems[vSelStartDNo].CharOffs + 1;
 
-  GetDataDrawItemRang(Max(ADataDrawTop, ADataScreenTop) - vVOffset,  // ¿ÉÏÔÊ¾³öÀ´µÄDItem·¶Î§
-    Min(ADataDrawBottom, ADataScreenBottom) - vVOffset, vFristDItemNo, vLastDItemNo);
+    vSelEndDNo := GetSelectEndDrawItemNo;      // é€‰ä¸­ç»“æŸDrawItem
+    if vSelEndDNo < 0 then
+      vSelEndDOffs := -1
+    else
+      vSelEndDOffs := FSelectInfo.EndItemOffset - FDrawItems[vSelEndDNo].CharOffs + 1;
 
-  if (vFristDItemNo < 0) or (vLastDItemNo < 0) then Exit;
+    vDrawsSelectAll := DrawItemSelectAll;
+  end;
 
-  // Ñ¡ÖĞĞÅÏ¢
-  vSelStartDNo := GetSelectStartDrawItemNo;  // Ñ¡ÖĞÆğÊ¼DItem
-  if vSelStartDNo < 0 then
-    vSelStartDOffs := -1
-  else
-    vSelStartDOffs := FSelectInfo.StartItemOffset - FDrawItems[vSelStartDNo].CharOffs + 1;
-  vSelEndDNo := GetSelectEndDrawItemNo;      // Ñ¡ÖĞ½áÊøDItem
-  if vSelEndDNo < 0 then
-    vSelEndDOffs := -1
-  else
-    vSelEndDOffs := FSelectInfo.EndItemOffset - FDrawItems[vSelEndDNo].CharOffs + 1;
-  vDrawsSelectAll := DrawItemSelectAll;
+  vPrioStyleNo := THCStyle.Null;
+  vPrioParaNo := THCStyle.Null;
+  vVOffset := ADataDrawTop - AVOffset;  // å°†æ•°æ®èµ·å§‹ä½ç½®æ˜ å°„åˆ°ç»˜åˆ¶ä½ç½®
 
-  vPrioStyleNo := -1;
-  vPrioParaNo := -1;
-
-  ACanvas.Refresh;
   vDCState := SaveDC(ACanvas.Handle);
   try
-    for i := vFristDItemNo to vLastDItemNo do  // ±éÀúÒª»æÖÆµÄÊı¾İ
-    begin
-      vDItem := FDrawItems[i];
-      vItem := FItems[vDItem.ItemNo];
-      vDrawRect := vDItem.Rect;
-      OffsetRect(vDrawRect, ADataDrawLeft, vVOffset);  // Æ«ÒÆµ½Ö¸¶¨µÄ»­²¼»æÖÆÎ»ÖÃ(SectionDataÊ±ÎªÒ³Êı¾İÔÚ¸ñÊ½»¯ÖĞ¿ÉÏÔÊ¾ÆğÊ¼Î»ÖÃ)
+    if not FDrawItems[AFristDItemNo].LineFirst then
+      vLineSpace := GetLineBlankSpace(AFristDItemNo);
 
-      {if APrint then  // debug
-      begin
-        ACanvas.Brush.Color := clRed;
-        ACanvas.FillRect(vDrawRect);
-      end;}
-      { »æÖÆÄÚÈİÇ° }
+    for i := AFristDItemNo to ALastDItemNo do  // éå†è¦ç»˜åˆ¶çš„æ•°æ®
+    begin
+      vDrawItem := FDrawItems[i];
+      vItem := FItems[vDrawItem.ItemNo];
+      vDrawRect := vDrawItem.Rect;
+      OffsetRect(vDrawRect, ADataDrawLeft, vVOffset);  // åç§»åˆ°æŒ‡å®šçš„ç”»å¸ƒç»˜åˆ¶ä½ç½®(SectionDataæ—¶ä¸ºé¡µæ•°æ®åœ¨æ ¼å¼åŒ–ä¸­å¯æ˜¾ç¤ºèµ·å§‹ä½ç½®)
+
+      if FDrawItems[i].LineFirst then
+        vLineSpace := GetLineBlankSpace(i);
+
+      { ç»˜åˆ¶å†…å®¹å‰ }
       DrawItemPaintBefor(Self, i, vDrawRect, ADataDrawLeft, ADataDrawBottom,
         ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
 
-      if vItem.StyleNo < THCStyle.RsNull then  // RectItem×ÔĞĞ´¦Àí»æÖÆ
+      if vPrioParaNo <> vItem.ParaNo then  // æ°´å¹³å¯¹é½æ–¹å¼
       begin
-        vPrioStyleNo := vItem.StyleNo;
+        vPrioParaNo := vItem.ParaNo;
+        vAlignHorz := FStyle.ParaStyles[vItem.ParaNo].AlignHorz;  // æ®µå†…å®¹æ°´å¹³å¯¹é½æ–¹å¼
+      end;
 
-        if vItem.IsSelectComplate then  // Ñ¡ÖĞ±³¾°ÇøÓò
+      vClearRect := vDrawRect;
+      InflateRect(vClearRect, 0, -vLineSpace div 2);  // é™¤å»è¡Œé—´è·å‡€Rectï¼Œå³å†…å®¹çš„æ˜¾ç¤ºåŒºåŸŸ
+      if vItem.StyleNo < THCStyle.Null then  // RectItemè‡ªè¡Œå¤„ç†ç»˜åˆ¶
+      begin
+        vRectItem := vItem as THCCustomRectItem;
+        vPrioStyleNo := vRectItem.StyleNo;
+
+        if vRectItem.JustifySplit then  // åˆ†æ•£å ç©ºé—´  ç›¸äº’å…³è” 201903261121
+        begin
+          if ((vAlignHorz = pahJustify) and (not IsParaLastDrawItem(i)))  // ä¸¤ç«¯å¯¹é½ä¸”ä¸æ˜¯æ®µæœ€å
+            or (vAlignHorz = pahScatter)  // åˆ†æ•£å¯¹é½
+          then
+          begin
+            if IsLineLastDrawItem(i) then  // è¡Œæœ€åä¸€ä¸ªï¼Œåˆ†æ•£å¢åŠ çš„ä½ç½®æ”¾åˆ°æœ€å‰é¢
+              vClearRect.Offset(vClearRect.Width - vRectItem.Width, 0);
+          end
+          else
+            vClearRect.Right := vClearRect.Left + vRectItem.Width;
+        end;
+
+        case FStyle.ParaStyles[vItem.ParaNo].AlignVert of  // å‚ç›´å¯¹é½æ–¹å¼
+          pavCenter: InflateRect(vClearRect, 0, -(vClearRect.Height - vRectItem.Height) div 2);
+          pavTop: ;
+        else
+          vClearRect.Top := vClearRect.Bottom - vRectItem.Height;
+        end;
+
+        DrawItemPaintContent(Self, i, vDrawRect, vClearRect, '', ADataDrawLeft,
+          ADataDrawBottom, ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
+
+        if vRectItem.IsSelectComplate then  // é€‰ä¸­èƒŒæ™¯åŒºåŸŸ
         begin
           ACanvas.Brush.Color := FStyle.SelColor;
           ACanvas.FillRect(vDrawRect);
         end;
-        // ³ıÈ¥ĞĞ¼ä¾à¾»Rect£¬¼´ÄÚÈİµÄÏÔÊ¾ÇøÓò(²»ĞèÒª³ıÈ¥£¬ÒòÎªvDrawRectÒÑ¾­ÊÇ¾»¸ßÁË)
-        InflateRect(vDrawRect, 0, -FStyle.ParaStyles[vItem.ParaNo].LineSpaceHalf);
-        if (vItem as THCCustomRectItem).JustifySplit then  // ·ÖÉ¢Õ¼¿Õ¼ä
-          vDrawRect.Right := vDrawRect.Left + (vItem as THCCustomRectItem).Width;
-        vItem.PaintTo(FStyle, vDrawRect, ADataDrawBottom, ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
+
+        vItem.PaintTo(FStyle, vClearRect, ADataDrawTop, ADataDrawBottom,
+          ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
       end
-      else  // ÎÄ±¾Item
+      else  // æ–‡æœ¬Item
       begin
-        if vItem.StyleNo <> vPrioStyleNo then  // ĞèÒªÖØĞÂÓ¦ÓÃÑùÊ½
+        if vItem.StyleNo <> vPrioStyleNo then  // éœ€è¦é‡æ–°åº”ç”¨æ ·å¼
         begin
           vPrioStyleNo := vItem.StyleNo;
-          FStyle.TextStyles[vPrioStyleNo].ApplyStyle(ACanvas);
-          FStyle.TextStyles[vPrioStyleNo].ApplyStyle(FStyle.DefCanvas);
-          vTextHeight := FStyle.DefCanvas.TextHeight('×Ö');
-        end;
-        // ÎÄ×Ö±³¾°
-        if doFontBackColor in FDrawOptions then
-        begin
-          if ACanvas.Brush.Style <> bsClear then
+
+          // ä¸Šæ ‡ã€ä¸‹æ ‡ä»…æ˜¯æ–‡æœ¬æ ·å¼ï¼Œé«˜åº¦ä»¥æ­£å¸¸é«˜åº¦ä¸ºå‡†ï¼Œå…ˆè®¡ç®—ï¼Œé˜²æ­¢ApplyStyleåå˜å°
+          //FStyle.DefCanvas.Font.Size := Round(FStyle.TextStyles[vPrioStyleNo].Size);
+          //vTextHeight := THCStyle.GetFontHeight(FStyle.DefCanvas);
+
+          FStyle.TextStyles[vPrioStyleNo].ApplyStyle(ACanvas, APaintInfo.ScaleY / APaintInfo.Zoom);
+          FStyle.ApplyTempStyle(vPrioStyleNo);//, APaintInfo.ScaleY / APaintInfo.Zoom);
+          //GetTextMetrics(FStyle.DefCanvas.Handle, vTextMetric);
+          vTextHeight := FStyle.TextStyles[vPrioStyleNo].FontHeight;// THCStyle.GetFontHeight(FStyle.TempCanvas);
+          if (tsSuperscript in FStyle.TextStyles[vPrioStyleNo].FontStyles)
+            or (tsSubscript in FStyle.TextStyles[vPrioStyleNo].FontStyles)
+          then
+            vTextHeight := vTextHeight + vTextHeight;
+
+          if vItem.HyperLink <> '' then
           begin
-            ACanvas.Brush.Color := FStyle.TextStyles[vPrioStyleNo].BackColor;
-            ACanvas.FillRect(Rect(vDrawRect.Left, vDrawRect.Top, vDrawRect.Left + vDItem.Width, vDrawRect.Bottom));
+            ACanvas.Font.Color := HyperTextColor;
+            ACanvas.Font.Style := ACanvas.Font.Style + [fsUnderline];
           end;
         end;
 
-        { »æÖÆÎÄ×Ö¡¢¶Î¡¢Ñ¡ÖĞÇé¿öÏÂµÄ±³¾° }
-        if not APaintInfo.Print then  // ²»ÊÇ´òÓ¡
+        case FStyle.ParaStyles[vItem.ParaNo].AlignVert of  // å‚ç›´å¯¹é½æ–¹å¼
+          pavCenter: vTextDrawTop := vClearRect.Top + (vClearRect.Bottom - vClearRect.Top - vTextHeight) div 2;
+          pavTop: vTextDrawTop := vClearRect.Top;
+        else
+          vTextDrawTop := vClearRect.Bottom - vTextHeight;
+        end;
+
+        if tsSubscript in FStyle.TextStyles[vPrioStyleNo].FontStyles then  // ä¸Šæ ‡æ—¶ä½ç½®ä¸å˜ï¼Œä¸‹æ ‡æ—¶ä¸­é—´ä½ç½®
+          vTextDrawTop := vTextDrawTop + vTextHeight div 2;
+
+        if FStyle.TextStyles[vPrioStyleNo].BackColor <> HCTransparentColor then  // æ–‡å­—èƒŒæ™¯
         begin
-          if vDrawsSelectAll then  // µ±Ç°Òª»æÖÆµÄÆğÊ¼ºÍ½áÊøDrawItem¶¼±»Ñ¡ÖĞ»òµ¥Ôª¸ñ±»È«Ñ¡ÖĞ£¬±³¾°ÎªÑ¡ÖĞ
+          ACanvas.Brush.Color := FStyle.TextStyles[vPrioStyleNo].BackColor;
+          ACanvas.FillRect(Rect(vClearRect.Left, vClearRect.Top, vClearRect.Left + vDrawItem.Width, vClearRect.Bottom));
+        end;
+
+        vText := Copy(vItem.Text, vDrawItem.CharOffs, vDrawItem.CharLen);  // ä¸ºå‡å°‘åˆ¤æ–­ï¼Œæ²¡æœ‰ç›´æ¥ä½¿ç”¨GetDrawItemText(i)
+        DrawItemPaintContent(Self, i, vDrawRect, vClearRect, vText, ADataDrawLeft,
+          ADataDrawBottom, ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
+
+        {$REGION ' ç»˜åˆ¶ä¼˜å…ˆçº§æ›´é«˜çš„é€‰ä¸­æƒ…å†µä¸‹çš„èƒŒæ™¯ '}
+        if not APaintInfo.Print then  // ä¸æ˜¯æ‰“å°
+        begin
+          if vDrawsSelectAll then  // å½“å‰è¦ç»˜åˆ¶çš„èµ·å§‹å’Œç»“æŸDrawIteméƒ½è¢«é€‰ä¸­æˆ–å•å…ƒæ ¼è¢«å…¨é€‰ä¸­ï¼ŒèƒŒæ™¯ä¸ºé€‰ä¸­
           begin
             ACanvas.Brush.Color := FStyle.SelColor;
             ACanvas.FillRect(Rect(vDrawRect.Left, vDrawRect.Top,
-              vDrawRect.Left + vDItem.Width, Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
+              vDrawRect.Left + vDrawItem.Width, Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
           end
-          else
+          else  // å¤„ç†ä¸€éƒ¨åˆ†é€‰ä¸­
+          if vSelEndDNo >= 0 then  // æœ‰é€‰ä¸­å†…å®¹ï¼Œéƒ¨åˆ†èƒŒæ™¯ä¸ºé€‰ä¸­
           begin
-            // ´¦ÀíÑ¡ÖĞ
-            if vSelEndDNo >= 0 then  // ÓĞÑ¡ÖĞÄÚÈİ£¬²¿·Ö±³¾°ÎªÑ¡ÖĞ
+            ACanvas.Brush.Color := FStyle.SelColor;
+            if (vSelStartDNo = vSelEndDNo) and (i = vSelStartDNo) then  // é€‰ä¸­å†…å®¹éƒ½åœ¨å½“å‰DrawItem
             begin
-              ACanvas.Brush.Color := FStyle.SelColor;
-              if (vSelStartDNo = vSelEndDNo) and (i = vSelStartDNo) then  // Ñ¡ÖĞÄÚÈİ¶¼ÔÚµ±Ç°DrawItem
-              begin
-                ACanvas.FillRect(Rect(vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelStartDOffs),
-                  vDrawRect.Top,
-                  vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelEndDOffs),
-                  Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
-              end
-              else
-              if i = vSelStartDNo then  // Ñ¡ÖĞÔÚ²»Í¬DrawItem£¬µ±Ç°ÊÇÆğÊ¼
-              begin
-                ACanvas.FillRect(Rect(vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelStartDOffs),
-                  vDrawRect.Top,
-                  vDrawRect.Right,
-                  Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
-              end
-              else
-              if i = vSelEndDNo then  // Ñ¡ÖĞÔÚ²»Í¬µÄDrawItem£¬µ±Ç°ÊÇ½áÊø
-              begin
-                ACanvas.FillRect(Rect(vDrawRect.Left,
-                  vDrawRect.Top,
-                  vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelEndDOffs),
-                  Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
-              end
-              else
-              if (i > vSelStartDNo) and (i < vSelEndDNo) then  // Ñ¡ÖĞÆğÊ¼ºÍ½áÊøDrawItemÖ®¼äµÄDrawItem
-                ACanvas.FillRect(vDrawRect);
-            end;
+              ACanvas.FillRect(Rect(vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelStartDOffs, FStyle.TempCanvas),
+                vDrawRect.Top,
+                vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelEndDOffs, FStyle.TempCanvas),
+                Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
+            end
+            else
+            if i = vSelStartDNo then  // é€‰ä¸­åœ¨ä¸åŒDrawItemï¼Œå½“å‰æ˜¯èµ·å§‹
+            begin
+              ACanvas.FillRect(Rect(vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelStartDOffs, FStyle.TempCanvas),
+                vDrawRect.Top,
+                vDrawRect.Right,
+                Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
+            end
+            else
+            if i = vSelEndDNo then  // é€‰ä¸­åœ¨ä¸åŒçš„DrawItemï¼Œå½“å‰æ˜¯ç»“æŸ
+            begin
+              ACanvas.FillRect(Rect(vDrawRect.Left,
+                vDrawRect.Top,
+                vDrawRect.Left + GetDrawItemOffsetWidth(i, vSelEndDOffs, FStyle.TempCanvas),
+                Math.Min(vDrawRect.Bottom, ADataScreenBottom)));
+            end
+            else
+            if (i > vSelStartDNo) and (i < vSelEndDNo) then  // é€‰ä¸­èµ·å§‹å’Œç»“æŸDrawItemä¹‹é—´çš„DrawItem
+              ACanvas.FillRect(vDrawRect);
           end;
         end;
+        {$ENDREGION}
 
-        // ³ıÈ¥ĞĞ¼ä¾à¾»Rect£¬¼´ÄÚÈİµÄÏÔÊ¾ÇøÓò
-        InflateRect(vDrawRect, 0, -FStyle.ParaStyles[vItem.ParaNo].LineSpaceHalf);
-        if tsSuperscript in FStyle.TextStyles[vPrioStyleNo].FontStyle then
-          vDrawRect.Bottom := vDrawRect.Top + vTextHeight
-        else
-        if tsSubscript in FStyle.TextStyles[vPrioStyleNo].FontStyle then
-          vDrawRect.Top := vDrawRect.Bottom - vTextHeight;
-        vItem.PaintTo(FStyle, vDrawRect, ADataDrawBottom, ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);  // ´¥·¢Item»æÖÆÊÂ¼ş
+        vItem.PaintTo(FStyle, vDrawRect, ADataDrawTop, ADataDrawBottom,
+          ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);  // è§¦å‘Itemç»˜åˆ¶äº‹ä»¶
 
-        // »æÖÆÎÄ±¾
-        ACanvas.Brush.Style := bsClear;
-        S := Copy(vItem.Text, vDItem.CharOffs, vDItem.CharLen);  // Îª¼õÉÙÅĞ¶Ï£¬Ã»ÓĞÖ±½ÓÊ¹ÓÃGetDrawItemText(i)
-        if S <> '' then
+        // ç»˜åˆ¶æ–‡æœ¬
+        if vText <> '' then
         begin
-          if vPrioParaNo <> vItem.ParaNo then
-          begin
-            vAlignHorz := FStyle.ParaStyles[vItem.ParaNo].AlignHorz;  // ¶ÎÄÚÈİË®Æ½¶ÔÆë·½Ê½
-            case FStyle.ParaStyles[vItem.ParaNo].AlignVert of  // ´¹Ö±¶ÔÆë·½Ê½
-              pavCenter: vAlignVert := DT_CENTER;
-              pavTop: vAlignVert := DT_TOP;
-            else
-              vAlignVert := DT_BOTTOM;
-            end;
-          end;
-
-          case vAlignHorz of
-            pahLeft, pahRight, pahCenter:  // Ò»°ã¶ÔÆë
+          ACanvas.Brush.Style := bsClear;  // é˜²æ­¢é€‰ä¸­åé¢çš„è¾“å‡ºæ–‡æœ¬æ—¶èƒŒæ™¯æ²¡æœ‰æ¸…ç©ºçš„é—®é¢˜
+          case vAlignHorz of  // æ°´å¹³å¯¹é½æ–¹å¼
+            pahLeft, pahRight, pahCenter:  // ä¸€èˆ¬å¯¹é½
               begin
-                vLen := Length(S);
-                SetLength(vCharWidths, vLen);
-                if GetTextExtentExPoint(FStyle.DefCanvas.Handle, PChar(S), vLen,
+                {if GetTextExtentExPoint(FStyle.DefCanvas.Handle, PChar(S), vLen,
                   vDrawRect.Right, @vFit, PInteger(vCharWidths), vSize)
-                then
-                begin
-                  for j := vLen - 1 downto 1 do
-                    Dec(vCharWidths[j], vCharWidths[j - 1]);
-                  case vAlignVert of
-                    DT_TOP: vDrawTop := vDrawRect.Top;
-                    DT_CENTER: vDrawTop := vDrawRect.Top + (vDrawRect.Bottom - vDrawRect.Top - vTextHeight) div 2;
-                  else
-                    vDrawTop := vDrawRect.Bottom - vTextHeight;
-                  end;
                   ExtTextOut(ACanvas.Handle, vDrawRect.Left, vDrawTop, ETO_CLIPPED, @vDrawRect, S, vLen, PInteger(vCharWidths));
-                end
-                else
-                  Windows.DrawText(ACanvas.Handle, S, -1, vDrawRect, DT_LEFT or DT_SINGLELINE or vAlignVert); // -1È«²¿
+                  Windows.DrawText(ACanvas.Handle, S, -1, vDrawRect, DT_LEFT or DT_SINGLELINE or vAlignVert);} // -1å…¨éƒ¨
+
+                vLen := Length(vText);
+
+                Windows.ExtTextOut(ACanvas.Handle, vClearRect.Left, vTextDrawTop,
+                  0, nil, PChar(vText), vLen, nil);  // å‚æ•°è¯´æ˜è§ 201805161718
+                //Windows.TextOut(ACanvas.Handle, vDrawRect.Left, vTextDrawTop, PChar(S), vLen);
               end;
 
-            pahJustify, pahScatter:  // ·ÖÉ¢¡¢Á½¶Ë¶ÔÆë
-              DrawTextJsutify(vDrawRect, S, IsLineLastDrawItem(i));
+            pahJustify, pahScatter:  // ä¸¤ç«¯ã€åˆ†æ•£å¯¹é½
+              DrawTextJsutify(vClearRect, vText, IsLineLastDrawItem(i));
           end;
-          //vItem.PaintAfter(vDrawRect, ACanvas, APrint);
+        end
+        else  // ç©ºè¡Œ
+        begin
+          if not vItem.ParaFirst then  // ä¸æ˜¯æ®µç©ºè¡Œ
+            raise Exception.Create(HCS_EXCEPTION_NULLTEXT);
         end;
       end;
-      { »æÖÆÄÚÈİºó }
-      DrawItemPaintAfter(Self, i, vDrawRect, ADataDrawLeft, ADataDrawBottom,
-        ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);
 
-      if (not APaintInfo.Print) and FStyle.ShowLineLastMark then
-      begin
-        if (i < FDrawItems.Count - 1) and FDrawItems[i + 1].ParaFirst then
-          DrawLineLastMrak(vDrawRect)  // ¶ÎÎ²µÄ»»ĞĞ·û
-        else
-        if i = FDrawItems.Count - 1 then
-          DrawLineLastMrak(vDrawRect);  // ¶ÎÎ²µÄ»»ĞĞ·û
-      end;
+      DrawItemPaintAfter(Self, i, vClearRect, ADataDrawLeft, ADataDrawBottom,
+        ADataScreenTop, ADataScreenBottom, ACanvas, APaintInfo);  // ç»˜åˆ¶å†…å®¹å
     end;
   finally
     RestoreDC(ACanvas.Handle, vDCState);
-    //ACanvas.Refresh;  ÎªÊ²Ã´ÓĞÕâ¾ä£¬±í¸ñÒş²Ø±ß¿òºóÄ³Ğ©µ¥Ôª¸ñ»æÖÆ±ß¿ò²»ÕıÈ·£¿
+    ACanvas.Refresh;
   end;
 end;
 
-procedure THCCustomData.FormatItemPrepare(const AStartItemNo: Integer;
-  const AEndItemNo: Integer = -1);
+procedure THCCustomData.PaintData(const ADataDrawLeft, ADataDrawTop, ADataDrawBottom,
+  ADataScreenTop, ADataScreenBottom, AVOffset: Integer;
+  const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 var
-  vFirstDrawItemNo, vLastDrawItemNo: Integer;
+  vFirstDItemNo, vLastDItemNo, vVOffset: Integer;
 begin
-  vFirstDrawItemNo := FItems[AStartItemNo].FirstDItemNo;
-  if AEndItemNo < 0 then
-    vLastDrawItemNo := GetItemLastDrawItemNo(AStartItemNo)
+  if FItems.Count = 0 then Exit;
+
+  vVOffset := ADataDrawTop - AVOffset;  // å°†æ•°æ®èµ·å§‹ä½ç½®æ˜ å°„åˆ°ç»˜åˆ¶ä½ç½®
+
+  GetDataDrawItemRang(Max(ADataDrawTop, ADataScreenTop) - vVOffset,  // å¯æ˜¾ç¤ºå‡ºæ¥çš„DrawItemèŒƒå›´
+    Min(ADataDrawBottom, ADataScreenBottom) - vVOffset, vFirstDItemNo, vLastDItemNo);
+
+  PaintData(ADataDrawLeft, ADataDrawTop, ADataDrawBottom, ADataScreenTop,
+    ADataScreenBottom, AVOffset, vFirstDItemNo, vLastDItemNo, ACanvas, APaintInfo);
+end;
+
+procedure THCCustomData.ParseXml(const ANode: IHCXMLNode);
+var
+  i: Integer;
+  vItemNode: IHCXMLNode;
+  vItem: THCCustomItem;
+begin
+  Clear;
+
+  for i := 0 to ANode.ChildNodes.Count - 1 do
+  begin
+    vItemNode := ANode.ChildNodes[i];
+    vItem := CreateItemByStyle(vItemNode.Attributes['sno']);
+    vItem.ParseXml(vItemNode);
+    FItems.Add(vItem);
+  end;
+
+  if Items[0].Length = 0 then  // åˆ é™¤Clearåé»˜è®¤çš„ç¬¬ä¸€ä¸ªç©ºè¡ŒItem
+    FItems.Delete(0);
+end;
+
+function THCCustomData.CalculateLineHeight(const ACanvas: TCanvas;
+  const ATextStyle: THCTextStyle; const ALineSpaceMode: TParaLineSpaceMode): Cardinal;
+var
+  //vOutlineTextmetric: ^TOutlineTextmetric;
+  //vFontSignature: TFontSignature;
+  //vHorizontalHeader: TT_HHEA;
+  vLineSpacing, vDelta, vLeading, vOtherLeading: Integer;
+  vAscent, vDescent{, vLineGap}: Word;
+  //vOutMetSize: Cardinal;
+  vSizeScale: Single;
+  vTextMetric: TTextMetric;
+begin
+  //ATextStyle.ApplyStyle(ACanvas);  è°ƒç”¨å‰è¯·ç¡®è®¤åº”ç”¨è¿‡æ ·å¼äº†
+
+  Result := ATextStyle.FontHeight;// THCStyle.GetFontHeight(ACanvas);  // è¡Œé«˜
+
+  if (ATextStyle.OutMetSize > 0) and ATextStyle.CJKFont then
+  begin
+    if (ATextStyle.OutlineTextmetric.otmfsSelection and 128) <> 0 then  // æœ‰åŠ ç²—æˆ–å…¶ä»–æ ·å¼
+    begin
+      vAscent := ATextStyle.OutlineTextmetric.otmAscent;
+      vDescent := -ATextStyle.OutlineTextmetric.otmDescent;
+      //vLineSpacing := vAscent + vDescent + ATextStyle.OutlineTextmetric.otmLineGap;
+    end
+    else
+    begin
+      vAscent := SwapBytes(ATextStyle.FontHeader.Ascender);
+      vDescent := -SwapBytes(ATextStyle.FontHeader.Descender); // åŸºçº¿å‘ä¸‹
+      //vLineGap := SwapBytes(ATextStyle.FontHeader.LineGap);
+      //vLineSpacing := vAscent + vDescent + vLineGap;
+      vSizeScale := ATextStyle.Size / FontSizeScale / ATextStyle.OutlineTextmetric.otmEMSquare;
+      vAscent := Ceil(vAscent * vSizeScale);
+      vDescent := Ceil(vDescent * vSizeScale);
+      //vLineSpacing := Ceil(vLineSpacing * vSizeScale);
+      //vUnderlinePosition := Ceil(vAscent * 1.15 + vDescent * 0.85);
+      vLineSpacing := Ceil(1.3 * (vAscent + vDescent));
+      vDelta := vLineSpacing - (vAscent + vDescent);
+      vLeading := vDelta div 2;
+      vOtherLeading := vDelta - vLeading;
+      Inc(vAscent, vLeading);
+      Inc(vDescent, vOtherLeading);
+
+      Result := vAscent + vDescent;
+      case ALineSpaceMode of
+        pls115: Result := Result + Trunc(3 * Result / 20);
+
+        pls150: Result := Trunc(3 * Result / 2);
+
+        pls200: Result := Result * 2;
+
+        plsFix: Result := Result + LineSpaceMin;
+      end;
+    end;
+  end
   else
-    vLastDrawItemNo := GetItemLastDrawItemNo(AEndItemNo);
-  FDrawItems.MarkFormatDelete(vFirstDrawItemNo, vLastDrawItemNo);
-  FDrawItems.FormatBeforBottom := FDrawItems[vLastDrawItemNo].Rect.Bottom;
+  begin
+    //GetTextMetrics(vDC, vTextMetric);  // å¾—åˆ°å­—ä½“åº¦é‡ä¿¡æ¯
+    vTextMetric := ATextStyle.TextMetric;
+
+    case ALineSpaceMode of
+      pls100: Result := Result + vTextMetric.tmExternalLeading; // Round(vTextMetric.tmHeight * 0.2);
+
+      pls115: Result := Result + vTextMetric.tmExternalLeading + Round((vTextMetric.tmHeight + vTextMetric.tmExternalLeading) * 0.15);
+
+      pls150: Result := Result + vTextMetric.tmExternalLeading + Round((vTextMetric.tmHeight + vTextMetric.tmExternalLeading) * 0.5);
+
+      pls200: Result := Result + vTextMetric.tmExternalLeading + vTextMetric.tmHeight + vTextMetric.tmExternalLeading;
+
+      plsFix: Result := Result + LineSpaceMin;
+    end;
+  end;
 end;
 
 procedure THCCustomData.SaveToStream(const AStream: TStream);
 begin
-  SaveToStream(AStream, 0, 0, Items.Count - 1, Items.Last.Length);
+  SaveToStream(AStream, 0, 0, FItems.Count - 1, FItems.Last.Length);
 end;
 
 procedure THCCustomData.SaveSelectToStream(const AStream: TStream);
@@ -2498,10 +2205,10 @@ begin
   if SelectExists then
   begin
     if (FSelectInfo.EndItemNo < 0)
-      and (FItems[FSelectInfo.StartItemNo].StyleNo < THCStyle.RsNull)
-    then  // Ñ¡Ôñ·¢ÉúÔÚÍ¬Ò»¸öRectItem
+      and (FItems[FSelectInfo.StartItemNo].StyleNo < THCStyle.Null)
+    then  // é€‰æ‹©ä»…å‘ç”Ÿåœ¨åŒä¸€ä¸ªRectItem
     begin
-      if FItems[FSelectInfo.StartItemNo].IsSelectComplate then  // È«Ñ¡ÖĞÁË
+      if (FItems[FSelectInfo.StartItemNo] as THCCustomRectItem).IsSelectComplateTheory then  // ç†è®ºå…¨é€‰ä¸­äº†
       begin
         Self.SaveToStream(AStream, FSelectInfo.StartItemNo, OffsetBefor,
           FSelectInfo.StartItemNo, OffsetAfter);
@@ -2523,7 +2230,7 @@ begin
 
   if SelectExists then
   begin
-    if (FSelectInfo.EndItemNo < 0) and (FItems[FSelectInfo.StartItemNo].StyleNo < THCStyle.RsNull) then
+    if (FSelectInfo.EndItemNo < 0) and (FItems[FSelectInfo.StartItemNo].StyleNo < THCStyle.Null) then
       Result := (FItems[FSelectInfo.StartItemNo] as THCCustomRectItem).SaveSelectToText
     else
     begin
@@ -2540,11 +2247,11 @@ var
   vBegPos, vEndPos: Int64;
 begin
   vBegPos := AStream.Position;
-  AStream.WriteBuffer(vBegPos, SizeOf(vBegPos));  // Êı¾İ´óĞ¡Õ¼Î»£¬±ãÓÚÔ½¹ı
+  AStream.WriteBuffer(vBegPos, SizeOf(vBegPos));  // æ•°æ®å¤§å°å ä½ï¼Œä¾¿äºè¶Šè¿‡
   //
-  { if IsEmpty then i := 0 else ¿ÕItemÒ²Òª´æ£¬CellData¼ÓÔØÊ±¸ß¶È¿ÉÓÉ´ËItemÑùÊ½¼ÆËã }
+  { if IsEmpty then i := 0 else ç©ºItemä¹Ÿè¦å­˜ï¼ŒCellDataåŠ è½½æ—¶é«˜åº¦å¯ç”±æ­¤Itemæ ·å¼è®¡ç®— }
   i := AEndItemNo - AStartItemNo + 1;
-  AStream.WriteBuffer(i, SizeOf(i));
+  AStream.WriteBuffer(i, SizeOf(i));  // æ•°é‡
   if i > 0 then
   begin
     if AStartItemNo <> AEndItemNo then
@@ -2561,7 +2268,7 @@ begin
   vEndPos := AStream.Position;
   AStream.Position := vBegPos;
   vBegPos := vEndPos - vBegPos - SizeOf(vBegPos);
-  AStream.WriteBuffer(vBegPos, SizeOf(vBegPos));  // µ±Ç°Ò³Êı¾İ´óĞ¡
+  AStream.WriteBuffer(vBegPos, SizeOf(vBegPos));  // å½“å‰é¡µæ•°æ®å¤§å°
   AStream.Position := vEndPos;
 end;
 
@@ -2576,30 +2283,32 @@ begin
   begin
     if AStartItemNo <> AEndItemNo then
     begin
-      if FItems[AStartItemNo].StyleNo > THCStyle.RsNull then
-        Result := (FItems[AStartItemNo] as THCTextItem).GetTextPart(AStartOffset + 1, FItems[AStartItemNo].Length - AStartOffset)
+      // èµ·å§‹
+      if FItems[AStartItemNo].StyleNo > THCStyle.Null then
+        Result := (FItems[AStartItemNo] as THCTextItem).SubString(AStartOffset + 1, FItems[AStartItemNo].Length - AStartOffset)
       else
         Result := (FItems[AStartItemNo] as THCCustomRectItem).SaveSelectToText;
 
-      for i := AStartItemNo + 1 to AEndItemNo - 1 do
+      for i := AStartItemNo + 1 to AEndItemNo - 1 do  // ä¸­é—´
         Result := Result + FItems[i].Text;
 
-      if FItems[AEndItemNo].StyleNo > THCStyle.RsNull then
-        Result := Result + (FItems[AEndItemNo] as THCTextItem).GetTextPart(1, AEndOffset)
+      // ç»“å°¾
+      if FItems[AEndItemNo].StyleNo > THCStyle.Null then
+        Result := Result + (FItems[AEndItemNo] as THCTextItem).SubString(1, AEndOffset)
       else
         Result := (FItems[AEndItemNo] as THCCustomRectItem).SaveSelectToText;
     end
-    else  // Ñ¡ÖĞÔÚÍ¬Ò»Item
+    else  // é€‰ä¸­åœ¨åŒä¸€Item
     begin
-      if FItems[AStartItemNo].StyleNo > THCStyle.RsNull then
-        Result := (FItems[AStartItemNo] as THCTextItem).GetTextPart(AStartOffset + 1, AEndOffset - AStartOffset);
+      if FItems[AStartItemNo].StyleNo > THCStyle.Null then
+        Result := (FItems[AStartItemNo] as THCTextItem).SubString(AStartOffset + 1, AEndOffset - AStartOffset);
     end;
   end;
 end;
 
 function THCCustomData.SaveToText: string;
 begin
-  SaveToText(0, 0, Items.Count - 1, Items.Last.Length);
+  Result := SaveToText(0, 0, FItems.Count - 1, FItems.Last.Length);
 end;
 
 procedure THCCustomData.SelectAll;
@@ -2608,10 +2317,10 @@ begin
   begin
     FSelectInfo.StartItemNo := 0;
     FSelectInfo.StartItemOffset := 0;
-    if not IsEmpty then
+    if not IsEmptyData then
     begin
       FSelectInfo.EndItemNo := FItems.Count - 1;
-      FSelectInfo.EndItemOffset := FItems.Last.Length;
+      FSelectInfo.EndItemOffset := GetItemOffsetAfter(FSelectInfo.EndItemNo);
     end
     else
     begin
@@ -2637,7 +2346,7 @@ begin
   begin
     for i := FSelectInfo.StartItemNo to FSelectInfo.EndItemNo do
     begin
-      if FItems[i].StyleNo < THCStyle.RsNull then
+      if FItems[i].StyleNo < THCStyle.Null then
       begin
         if not FItems[i].IsSelectComplate then
         begin
@@ -2670,7 +2379,7 @@ begin
   Result := (FSelectInfo.StartItemNo = 0)
     and (FSelectInfo.StartItemOffset = 0)
     and (FSelectInfo.EndItemNo = FItems.Count - 1)
-    and (FSelectInfo.EndItemOffset = FItems.Last.Length);
+    and (FSelectInfo.EndItemOffset = GetItemOffsetAfter(FItems.Count - 1));
 end;
 
 function THCCustomData.SelectExists(const AIfRectItem: Boolean = True): Boolean;
@@ -2680,16 +2389,16 @@ begin
   begin
     if FSelectInfo.EndItemNo >= 0 then
     begin
-      if FSelectInfo.StartItemNo <> FSelectInfo.EndItemNo then  // Ñ¡ÔñÔÚ²»Í¬µÄItem
+      if FSelectInfo.StartItemNo <> FSelectInfo.EndItemNo then  // é€‰æ‹©åœ¨ä¸åŒçš„Item
         Result := True
-      else  // ÔÚÍ¬Ò»Item
-        Result := FSelectInfo.StartItemOffset <> FSelectInfo.EndItemOffset;  // Í¬Ò»Item²»Í¬Î»ÖÃ
+      else  // åœ¨åŒä¸€Item
+        Result := FSelectInfo.StartItemOffset <> FSelectInfo.EndItemOffset;  // åŒä¸€Itemä¸åŒä½ç½®
     end
-    else  // µ±Ç°¹â±ê½öÔÚÒ»¸öItemÖĞ(ÔÚRectÖĞ¼´Ê¹ÓĞÑ¡ÖĞ£¬Ïà¶Ôµ±Ç°²ãµÄDataÒ²ËãÔÚÒ»¸öItem)
+    else  // å½“å‰å…‰æ ‡ä»…åœ¨ä¸€ä¸ªItemä¸­(åœ¨Rectä¸­å³ä½¿æœ‰é€‰ä¸­ï¼Œç›¸å¯¹å½“å‰å±‚çš„Dataä¹Ÿç®—åœ¨ä¸€ä¸ªItem)
     begin
-      if AIfRectItem and (FItems[FSelectInfo.StartItemNo].StyleNo < THCStyle.RsNull) then
+      if AIfRectItem and (FItems[FSelectInfo.StartItemNo].StyleNo < THCStyle.Null) then
       begin
-        //if FSelectInfo.StartItemOffset = OffsetInner then  ±í¸ñÕûÌåÑ¡ÖĞÊ±²»³ÉÁ¢
+        //if FSelectInfo.StartItemOffset = OffsetInner then  è¡¨æ ¼æ•´ä½“é€‰ä¸­æ—¶ä¸æˆç«‹
           Result := (FItems[FSelectInfo.StartItemNo] as THCCustomRectItem).SelectExists;
       end;
     end;
@@ -2705,46 +2414,191 @@ begin
     Result := False
   else
   begin
-    if GetDrawItemStyle(vStartDNo) < THCStyle.RsNull then
+    if GetDrawItemStyle(vStartDNo) < THCStyle.Null then
       Result := FItems[FDrawItems[vStartDNo].ItemNo].IsSelectComplate and (FSelectInfo.EndItemNo < 0)
     else
       Result := vStartDNo = GetSelectEndDrawItemNo;
   end;
 end;
 
+procedure THCCustomData.SetCaretDrawItemNo(const Value: Integer);
+var
+  vItemNo: Integer;
+begin
+  if FCaretDrawItemNo <> Value then
+  begin
+    if (FCaretDrawItemNo >= 0) and (FCaretDrawItemNo < FDrawItems.Count) then  // æœ‰æ—§çš„
+    begin
+      vItemNo := FDrawItems[FCaretDrawItemNo].ItemNo;
+      FItems[vItemNo].Active := False;  // æ—§çš„å–æ¶ˆæ¿€æ´»
+    end
+    else
+      vItemNo := -1;
+
+    FCaretDrawItemNo := Value;
+
+    if (FCaretDrawItemNo >= 0) and (FDrawItems[FCaretDrawItemNo].ItemNo <> vItemNo) then  // æœ‰æ–°çš„
+    begin
+      if FItems[FDrawItems[FCaretDrawItemNo].ItemNo].StyleNo < THCStyle.Null then
+      begin
+        if FSelectInfo.StartItemOffset = OffsetInner then
+          FItems[FDrawItems[FCaretDrawItemNo].ItemNo].Active := True
+      end
+      else
+        FItems[FDrawItems[FCaretDrawItemNo].ItemNo].Active := True;  // æ¿€æ´»æ–°çš„
+    end;
+  end;
+end;
+
+procedure THCCustomData.SetCurParaNo(const Value: Integer);
+begin
+  if FCurParaNo <> Value then
+  begin
+    FCurParaNo := Value;
+    if Assigned(FOnCurParaNoChange) then
+      FOnCurParaNoChange(Self);
+  end;
+end;
+
+procedure THCCustomData.SetCurStyleNo(const Value: Integer);
+begin
+  if FCurStyleNo <> Value then
+    FCurStyleNo := Value;
+end;
+
+function THCCustomData.ToHtml(const APath: string): string;
+var
+  i: Integer;
+begin
+  Result := '';
+  for i := 0 to Items.Count - 1 do
+  begin
+    if Items[i].ParaFirst then
+    begin
+      if i <> 0 then
+        Result := Result + sLineBreak + '</p>';
+      Result := Result + sLineBreak + '<p class="ps' + IntToStr(Items[i].ParaNo) + '">';
+    end;
+    Result := Result + sLineBreak + Items[i].ToHtml(APath);
+  end;
+
+  Result := Result + sLineBreak + '</p>';
+end;
+
+procedure THCCustomData.ToXml(const ANode: IHCXMLNode);
+var
+  i: Integer;
+  vNode: IHCXMLNode;
+begin
+  ANode.Attributes['itemcount'] := FItems.Count;
+  for i := 0 to FItems.Count - 1 do
+  begin
+    vNode := ANode.AddChild('item');
+    FItems[i].ToXml(vNode);
+  end;
+end;
+
 procedure THCCustomData.GetCaretInfo(const AItemNo, AOffset: Integer;
-  var ACaretInfo: TCaretInfo);
+  var ACaretInfo: THCCaretInfo);
 var
   vDrawItemNo: Integer;
   vDrawItem: THCCustomDrawItem;
+  vRectItem: THCCustomRectItem;
+
+  procedure GetRectItemInnerCaretInfo;
+  var
+    vLineSpaceHalf: Integer;
+    vDrawRect: TRect;
+  begin
+    vRectItem.GetCaretInfo(ACaretInfo);
+
+    vDrawRect := vDrawItem.Rect;
+    vLineSpaceHalf := GetLineBlankSpace(vDrawItemNo) div 2;
+    InflateRect(vDrawRect, 0, -vLineSpaceHalf);
+
+    case FStyle.ParaStyles[FItems[AItemNo].ParaNo].AlignVert of  // å‚ç›´å¯¹é½æ–¹å¼
+      pavCenter: ACaretInfo.Y := ACaretInfo.Y + vLineSpaceHalf + (vDrawRect.Height - vRectItem.Height) div 2;
+
+      pavTop: ACaretInfo.Y := ACaretInfo.Y + vLineSpaceHalf;
+    else
+      ACaretInfo.Y := ACaretInfo.Y + vLineSpaceHalf + vDrawRect.Height - vRectItem.Height;
+    end;
+  end;
+
+var
+  vStyleItemNo: Integer;
 begin
-  { ×¢Òâ£ºÎª´¦ÀíRectItemÍùÍâµü´ú£¬ÕâÀïÎ»ÖÃ´¦ÀíÎªµş¼Ó£¬¶ø²»ÊÇÖ±½Ó¸³Öµ }
+  { æ³¨æ„ï¼šä¸ºå¤„ç†RectItemå¾€å¤–è¿­ä»£ï¼Œè¿™é‡Œä½ç½®å¤„ç†ä¸ºå åŠ ï¼Œè€Œä¸æ˜¯ç›´æ¥èµ‹å€¼ }
   if FCaretDrawItemNo < 0 then
   begin
-    if FItems[AItemNo].StyleNo < THCStyle.RsNull then  // RectItem
+    if FItems[AItemNo].StyleNo < THCStyle.Null then  // RectItem
       vDrawItemNo := FItems[AItemNo].FirstDItemNo
     else
-      vDrawItemNo := GetDrawItemNoByOffset(AItemNo, AOffset);  // AOffset´¦¶ÔÓ¦µÄDrawItemNo
+      vDrawItemNo := GetDrawItemNoByOffset(AItemNo, AOffset);  // AOffsetå¤„å¯¹åº”çš„DrawItemNo
   end
   else
     vDrawItemNo := FCaretDrawItemNo;
 
   vDrawItem := FDrawItems[vDrawItemNo];
-  ACaretInfo.Height := vDrawItem.Height;  // ¹â±ê¸ß¶È
+  ACaretInfo.Height := vDrawItem.Height;  // å…‰æ ‡é«˜åº¦
 
-  if FItems[AItemNo].StyleNo < THCStyle.RsNull then  // RectItem
+  if FStyle.UpdateInfo.ReStyle then  // ä»¥å…‰æ ‡å‰æ ·å¼ä¸ºå½“å‰æ ·å¼
   begin
-    if AOffset = OffsetBefor then  // ÔÚÆä×ó²à
-      ACaretInfo.X := ACaretInfo.X + vDrawItem.Rect.Left
-    else
-    if AOffset = OffsetInner then  // ÕıÔÚÆäÉÏ£¬ÓÉÄÚ²¿¾ö¶¨
+    vStyleItemNo := AItemNo;
+    if AOffset = 0 then  // åœ¨æœ€å‰é¢
     begin
-      (FItems[AItemNo] as THCCustomRectItem).GetCaretInfo(ACaretInfo);
+      if (not FItems[AItemNo].ParaFirst)
+        and (AItemNo > 0)
+        and (Items[AItemNo - 1].StyleNo > THCStyle.Null)
+      then  // å‰ä¸€ä¸ªæ˜¯TextItem
+        vStyleItemNo := AItemNo - 1;
+    end;
+
+    if (Items[vStyleItemNo] is THCTextRectItem) and (FSelectInfo.StartItemOffset = OffsetInner) then
+      Self.CurStyleNo := (Items[vStyleItemNo] as THCTextRectItem).TextStyleNo
+    else
+      Self.CurStyleNo := Items[vStyleItemNo].StyleNo;
+
+    Self.CurParaNo := Items[vStyleItemNo].ParaNo;
+  end;
+
+  if FItems[AItemNo].StyleNo < THCStyle.Null then  // RectItem
+  begin
+    vRectItem := FItems[AItemNo] as THCCustomRectItem;
+
+    if AOffset = OffsetBefor then  // åœ¨å…¶å·¦ä¾§
+    begin
+      if vRectItem.CanPageBreak then
+        GetRectItemInnerCaretInfo;
+
       ACaretInfo.X := ACaretInfo.X + vDrawItem.Rect.Left;
-      ACaretInfo.Y := ACaretInfo.Y + FStyle.ParaStyles[FItems[AItemNo].ParaNo].LineSpaceHalf;
     end
-    else  // ÔÚÆäÓÒ²à
+    else
+    if AOffset = OffsetInner then  // æ­£åœ¨å…¶ä¸Šï¼Œç”±å†…éƒ¨å†³å®š
+    begin
+      GetRectItemInnerCaretInfo;
+      ACaretInfo.X := ACaretInfo.X + vDrawItem.Rect.Left;
+    end
+    else  // åœ¨å…¶å³ä¾§
+    begin
+      if vRectItem.CanPageBreak then
+        GetRectItemInnerCaretInfo;
+
       ACaretInfo.X := ACaretInfo.X + vDrawItem.Rect.Right;
+    end;
+
+    if vRectItem.JustifySplit then  // åˆ†æ•£å ç©ºé—´  ç›¸äº’å…³è” 201903261121
+    begin
+      if ((FStyle.ParaStyles[vRectItem.ParaNo].AlignHorz = pahJustify) and (not IsParaLastDrawItem(vDrawItemNo)))  // ä¸¤ç«¯å¯¹é½ä¸”ä¸æ˜¯æ®µæœ€å
+        or (FStyle.ParaStyles[vRectItem.ParaNo].AlignHorz = pahScatter)  // åˆ†æ•£å¯¹é½
+      then
+      begin
+        if IsLineLastDrawItem(vDrawItemNo) then  // è¡Œæœ€åä¸€ä¸ªï¼Œåˆ†æ•£å¢åŠ çš„ä½ç½®æ”¾åˆ°æœ€å‰é¢
+          ACaretInfo.X := ACaretInfo.X + vDrawItem.Width - vRectItem.Width;
+      end
+      else
+        ACaretInfo.X := ACaretInfo.X + vDrawItem.Width - vRectItem.Width;
+    end;
   end
   else  // TextItem
     ACaretInfo.X := ACaretInfo.X + vDrawItem.Rect.Left
@@ -2753,21 +2607,17 @@ begin
   ACaretInfo.Y := ACaretInfo.Y + vDrawItem.Rect.Top;
 end;
 
+procedure THCCustomData.InitializeField;
+begin
+  //if FCaretDrawItemNo >= 0 then  // è¡¨æ ¼ä¸Šåˆ é™¤é€‰ä¸­å•å…ƒæ ¼ä¸­çš„å†…å®¹æ—¶ï¼Œå› ä¸ºåˆ é™¤å‰è¡¨æ ¼Activeè¢«è¿™é‡Œå¤„ç†æˆFalseäº†å¯¼è‡´åˆ é™¤æ—¶å•å…ƒæ ¼æ²¡æœ‰é€‰ä¸­åˆ é™¤æ— æ•ˆ
+  //  FItems[FDrawItems[FCaretDrawItemNo].ItemNo].Active := False;
+
+  FCaretDrawItemNo := -1;
+end;
+
 function THCCustomData.InsertStream(const AStream: TStream;
   const AStyle: THCStyle; const AFileVersion: Word): Boolean;
 begin
-end;
-
-function THCCustomData.IsEmpty: Boolean;
-begin
-  Result := (FItems.Count = 0)  // Ã»ÓĞItem
-    or (
-         (FItems.Count = 1)  // ÓĞ1¸öItem
-         and (
-               (FItems[0].StyleNo >= 0)  // ÊÇÎÄ±¾
-                and (FItems[0].Text = '')  // ÄÚÈİ²»Îª¿Õ
-              )
-        );
 end;
 
 { TSelectInfo }

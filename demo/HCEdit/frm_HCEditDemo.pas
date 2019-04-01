@@ -93,6 +93,10 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure btnBoldClick(Sender: TObject);
+    procedure btnSaveClick(Sender: TObject);
+    procedure btnOpenClick(Sender: TObject);
+    procedure mniN9Click(Sender: TObject);
+    procedure mniInsertTableClick(Sender: TObject);
   private
     { Private declarations }
     FHCEdit: THCEdit;
@@ -106,19 +110,58 @@ var
 implementation
 
 uses
-  HCTextStyle;
+  HCTextStyle, HCCommon, HCImageItem, HCRichData;
 
 {$R *.dfm}
 
 procedure TfrmHCEdit.btnBoldClick(Sender: TObject);
 begin
   case (Sender as TToolButton).Tag of
-    0: FHCEdit.ApplyTextStyle(TFontStyleEx.tsBold);
-    1: FHCEdit.ApplyTextStyle(TFontStyleEx.tsItalic);
-    2: FHCEdit.ApplyTextStyle(TFontStyleEx.tsUnderline);
-    3: FHCEdit.ApplyTextStyle(TFontStyleEx.tsStrikeOut);
-    4: FHCEdit.ApplyTextStyle(TFontStyleEx.tsSuperscript);
-    5: FHCEdit.ApplyTextStyle(TFontStyleEx.tsSubscript);
+    0: FHCEdit.ApplyTextStyle(THCFontStyle.tsBold);
+    1: FHCEdit.ApplyTextStyle(THCFontStyle.tsItalic);
+    2: FHCEdit.ApplyTextStyle(THCFontStyle.tsUnderline);
+    3: FHCEdit.ApplyTextStyle(THCFontStyle.tsStrikeOut);
+    4: FHCEdit.ApplyTextStyle(THCFontStyle.tsSuperscript);
+    5: FHCEdit.ApplyTextStyle(THCFontStyle.tsSubscript);
+  end;
+end;
+
+procedure TfrmHCEdit.btnOpenClick(Sender: TObject);
+var
+  vOpenDlg: TOpenDialog;
+begin
+  vOpenDlg := TOpenDialog.Create(Self);
+  try
+    vOpenDlg.Filter := '文件|*' + HC_EDIT_EXT;
+    if vOpenDlg.Execute then
+    begin
+      if vOpenDlg.FileName <> '' then
+      begin
+        Application.ProcessMessages;  // 解决双击打开文件后，触发下层控件的Mousemove，Mouseup事件
+        FHCEdit.LoadFromFile(vOpenDlg.FileName);
+      end;
+    end;
+  finally
+    FreeAndNil(vOpenDlg);
+  end;
+end;
+
+procedure TfrmHCEdit.btnSaveClick(Sender: TObject);
+var
+  vDlg: TSaveDialog;
+begin
+  vDlg := TSaveDialog.Create(Self);
+  try
+    vDlg.Filter := '文件|*' + HC_EDIT_EXT;
+    vDlg.Execute;
+    if vDlg.FileName <> '' then
+    begin
+      if ExtractFileName(vDlg.FileName) <> HC_EDIT_EXT then
+        vDlg.FileName := vDlg.FileName + HC_EDIT_EXT;
+      FHCEdit.SaveToFile(vDlg.FileName);
+    end;
+  finally
+    vDlg.Free;
   end;
 end;
 
@@ -132,6 +175,37 @@ end;
 procedure TfrmHCEdit.FormDestroy(Sender: TObject);
 begin
   FHCEdit.Free;
+end;
+
+procedure TfrmHCEdit.mniInsertTableClick(Sender: TObject);
+begin
+  FHCEdit.InsertTable(2, 2);
+end;
+
+procedure TfrmHCEdit.mniN9Click(Sender: TObject);
+var
+  vOpenDlg: TOpenDialog;
+  vImageItem: THCImageItem;
+  vTopData: THCRichData;
+begin
+  vOpenDlg := TOpenDialog.Create(Self);
+  try
+    vOpenDlg.Filter := '图像文件|*.bmp';//|*.jpg|*.jpge|*.png';
+    if vOpenDlg.Execute then
+    begin
+      if vOpenDlg.FileName <> '' then
+      begin
+        vTopData := FHCEdit.TopLevelData;
+        vImageItem := THCImageItem.Create(vTopData);
+        vImageItem.LoadFromBmpFile(vOpenDlg.FileName);
+        vImageItem.RestrainSize(vTopData.Width, vImageItem.Height);
+        Application.ProcessMessages;  // 解决双击打开文件后，触发下层控件的Mousemove，Mouseup事件
+        FHCEdit.InsertItem(vImageItem);
+      end;
+    end;
+  finally
+    FreeAndNil(vOpenDlg);
+  end;
 end;
 
 end.

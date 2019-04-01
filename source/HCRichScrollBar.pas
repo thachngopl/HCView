@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -14,7 +14,7 @@ unit HCRichScrollBar;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, System.Generics.Collections, HCScrollBar;
+  Windows, Classes, Controls, Graphics, Generics.Collections, HCScrollBar;
 
 type
   TAreaMark = class(TObject)  // 区域标记
@@ -75,9 +75,6 @@ procedure THCRichScrollBar.DoDrawThumBefor(const ACanvas: TCanvas;
 var
   i, vDrawTop, vDrawHeight: Integer;
 begin
-  Canvas.Brush.Style := bsSolid;
-  Canvas.Brush.Color := clBlue;
-
   case Self.Orientation of
     oriHorizontal:
       begin
@@ -86,12 +83,14 @@ begin
       begin
         if Assigned(FAreaMarks) then
         begin
+          ACanvas.Brush.Color := clBlue;
+
           for i := 0 to FAreaMarks.Count - 1 do
           begin
             vDrawTop := ButtonSize + Round(FAreaMarks[i].Position * Percent);
             vDrawHeight := Round(FAreaMarks[i].Height * Percent);
 
-            ACanvas.FillRect(Bounds(AThumRect.Left, vDrawTop, AThumRect.Width, vDrawHeight));
+            ACanvas.FillRect(Bounds(AThumRect.Left, vDrawTop, AThumRect.Right - AThumRect.Left, vDrawHeight));
           end;
         end;
       end;

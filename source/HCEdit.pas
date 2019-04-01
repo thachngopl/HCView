@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -14,16 +14,20 @@ unit HCEdit;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Messages, SysUtils, IMM, HCRichData,
-  HCCommon, HCScrollBar, HCStyle, HCTextStyle, HCParaStyle, HCItem;
+  Windows, Classes, Controls, Graphics, Messages, SysUtils, Forms, IMM, HCViewData,
+  HCCommon, HCScrollBar, HCStyle, HCTextStyle, HCParaStyle, HCItem, HCUndo, HCRichData;
+
+const
+  HC_EDIT_EXT = '.hef';
 
 type
   THCEdit = class(TCustomControl)
   private
     FStyle: THCStyle;
-    FData: THCRichData;
+    FData: THCViewData;
     FDataBmp: TBitmap;  // 数据显示位图
-    FCaret: TCaret;
+    FUndoList: THCUndoList;
+    FCaret: THCCaret;
     FHScrollBar: THCScrollBar;
     FVScrollBar: THCScrollBar;
     FUpdateCount: Integer;
@@ -35,18 +39,21 @@ type
     function GetDisplayWidth: Integer;
     function GetDisplayHeight: Integer;
 
+    function GetCurStyleNo: Integer;
+    function GetCurParaNo: Integer;
+
     /// <summary> 重新获取光标位置 </summary>
     procedure ReBuildCaret(const AScrollBar: Boolean = False);
 
     /// <summary> 是否由滚动条位置变化引起的更新 </summary>
     procedure CheckUpdateInfo(const AScrollBar: Boolean = False);
     procedure DoVScrollChange(Sender: TObject; ScrollCode: TScrollCode;
-      var ScrollPos: Integer);
+      const ScrollPos: Integer);
 
     /// <summary> 文档"背板"变动(数据无变化，如对称边距，缩放视图) </summary>
     procedure DoMapChanged;
     procedure DoCaretChange;
-    procedure DoSectionDataCheckUpdateInfo;
+    procedure DoDataCheckUpdateInfo;
     procedure DoChange;
     procedure UpdateBuffer;
     procedure BeginUpdate;
@@ -87,7 +94,14 @@ type
     procedure Copy;
     procedure Paste;
     //
-    function DataChangeByAction(const AProc: TChangeProc): Boolean;
+    function DataChangeByAction(const AFun: THCFunction): Boolean;
+
+    function DoGetUndoList: THCUndoList;
+    function DoUndoNew: THCUndo;
+    function DoUndoGroupBegin(const AItemNo, AOffset: Integer): THCUndoGroupBegin;
+    function DoUndoGroupEnd(const AItemNo, AOffset: Integer): THCUndoGroupEnd;
+    procedure DoUndo(const Sender: THCUndo);
+    procedure DoRedo(const Sender: THCUndo);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -95,18 +109,39 @@ type
     procedure ApplyParaAlignHorz(const AAlign: TParaAlignHorz);
     procedure ApplyParaAlignVert(const AAlign: TParaAlignVert);
     procedure ApplyParaBackColor(const AColor: TColor);
-    procedure ApplyParaLineSpace(const ASpace: Integer);
-    procedure ApplyTextStyle(const AFontStyle: TFontStyleEx);
+    procedure ApplyParaLineSpace(const ASpaceMode: TParaLineSpaceMode);
+    procedure ApplyTextStyle(const AFontStyle: THCFontStyle);
     procedure ApplyTextFontName(const AFontName: TFontName);
-    procedure ApplyTextFontSize(const AFontSize: Integer);
+    procedure ApplyTextFontSize(const AFontSize: Single);
     procedure ApplyTextColor(const AColor: TColor);
     procedure ApplyTextBackColor(const AColor: TColor);
     function InsertItem(const AItem: THCCustomItem): Boolean; overload;
     function InsertItem(const AIndex: Integer; const AItem: THCCustomItem): Boolean; overload;
-    property Style: THCStyle read FStyle;
-    property Changed: Boolean read FChanged write FChanged;
+    /// <summary> 插入指定行列的表格 </summary>
+    function InsertTable(const ARowCount, AColCount: Integer): Boolean;
+    /// <summary> 获取顶层Data </summary>
+    function TopLevelData: THCRichData;
+
+    /// <summary> 全选 </summary>
+    procedure SelectAll;
+    procedure SaveToFile(const AFileName: string);
+    procedure LoadFromFile(const AFileName: string);
     procedure SaveToStream(const AStream: TStream);
     procedure LoadFromStream(const AStream: TStream);
+
+    /// <summary> 撤销 </summary>
+    procedure Undo;
+
+    /// <summary> 重做 </summary>
+    procedure Redo;
+
+    /// <summary> 当前光标处的文本样式 </summary>
+    property CurStyleNo: Integer read GetCurStyleNo;
+    /// <summary> 当前光标处的段样式 </summary>
+    property CurParaNo: Integer read GetCurParaNo;
+
+    property Style: THCStyle read FStyle;
+    property Changed: Boolean read FChanged write FChanged;
   published
     property OnMouseDown: TMouseEvent read FOnMouseDown write FOnMouseDown;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -137,9 +172,9 @@ begin
   CheckUpdateInfo;
 end;
 
-procedure THCEdit.ApplyParaLineSpace(const ASpace: Integer);
+procedure THCEdit.ApplyParaLineSpace(const ASpaceMode: TParaLineSpaceMode);
 begin
-  FData.ApplyParaLineSpace(ASpace);
+  FData.ApplyParaLineSpace(ASpaceMode);
   CheckUpdateInfo;
 end;
 
@@ -161,13 +196,13 @@ begin
   CheckUpdateInfo;
 end;
 
-procedure THCEdit.ApplyTextFontSize(const AFontSize: Integer);
+procedure THCEdit.ApplyTextFontSize(const AFontSize: Single);
 begin
   FData.ApplyTextFontSize(AFontSize);
   CheckUpdateInfo;
 end;
 
-procedure THCEdit.ApplyTextStyle(const AFontStyle: TFontStyleEx);
+procedure THCEdit.ApplyTextStyle(const AFontStyle: THCFontStyle);
 begin
   FData.ApplyTextStyle(AFontStyle);
   CheckUpdateInfo;
@@ -179,11 +214,9 @@ begin
 end;
 
 procedure THCEdit.CalcScrollRang;
-var
-  i, vWidth, vVMax, vHMax: Integer;
 begin
-  FHScrollBar.Max := MinPadding * 2;
-  FVScrollBar.Max := FData.Height;
+  FHScrollBar.Max := Self.Padding.Left + Self.Padding.Right;
+  FVScrollBar.Max := FData.Height + Self.Padding.Top + Self.Padding.Bottom;
 end;
 
 procedure THCEdit.CheckUpdateInfo(const AScrollBar: Boolean);
@@ -212,14 +245,14 @@ begin
   begin
     vStream := TMemoryStream.Create;
     try
-      //_SaveFileFormatAndVersion(vStream);  // 保存文件格式和版本
+      _SaveFileFormatAndVersion(vStream);  // 保存文件格式和版本
       //DoCopyDataBefor(vStream);  // 通知保存事件
-      //_DeleteUnUsedStyle;  // 保存已使用的样式
+      _DeleteUnUsedStyle;  // 保存已使用的样式
       FStyle.SaveToStream(vStream);
       FData.GetTopLevelData.SaveSelectToStream(vStream);
       vMem := GlobalAlloc(GMEM_MOVEABLE or GMEM_DDESHARE, vStream.Size);
       if vMem = 0 then
-        raise Exception.Create(CFE_EXCEPTION + '复制时没有申请到足够的内存！');
+        raise Exception.Create(HCS_EXCEPTION_MEMORYLESS);
       vPtr := GlobalLock(vMem);
       Move(vStream.Memory^, vPtr^, vStream.Size);
       GlobalUnlock(vMem);
@@ -243,8 +276,17 @@ begin
   //
   FStyle := THCStyle.CreateEx(True, True);
 
-  FData := THCRichData.Create(FStyle);
+  FUndoList := THCUndoList.Create;
+  FUndoList.OnUndo := DoUndo;
+  FUndoList.OnRedo := DoRedo;
+  FUndoList.OnUndoNew := DoUndoNew;
+  FUndoList.OnUndoGroupStart := DoUndoGroupBegin;
+  FUndoList.OnUndoGroupEnd := DoUndoGroupEnd;
+
+  FData := THCViewData.Create(FStyle);
   FData.Width := 200;
+  FData.OnGetUndoList := DoGetUndoList;
+
   FDataBmp := TBitmap.Create;
 
   // 垂直滚动条，范围在Resize中设置
@@ -265,7 +307,12 @@ procedure THCEdit.CreateWnd;
 begin
   inherited CreateWnd;
   if not (csDesigning in ComponentState) then
-    FCaret := TCaret.Create(Handle);
+  begin
+    if Assigned(FCaret) then  // 防止切换Parent时多次创建
+      FreeAndNil(FCaret);
+
+    FCaret := THCCaret.Create(Handle);
+  end;
 end;
 
 procedure THCEdit.Cut;
@@ -275,13 +322,13 @@ begin
   CheckUpdateInfo;
 end;
 
-function THCEdit.DataChangeByAction(const AProc: TChangeProc): Boolean;
+function THCEdit.DataChangeByAction(const AFun: THCFunction): Boolean;
 //var
 //  vHeight, vCruItemNo: Integer;
 begin
   //vHeight := FData.Height;
   //vCruItemNo := FData.GetCurItemNo;
-  Result := AProc;
+  Result := AFun;
   DoChange;
 end;
 
@@ -329,17 +376,108 @@ begin
   Result := True;
 end;
 
-procedure THCEdit.DoSectionDataCheckUpdateInfo;
+procedure THCEdit.DoRedo(const Sender: THCUndo);
+var
+  vUndoList: THCUndoList;
+begin
+  if Sender is THCEditUndo then
+  begin
+    FHScrollBar.Position := (Sender as THCEditUndo).HScrollPos;
+    FVScrollBar.Position := (Sender as THCEditUndo).VScrollPos;
+  end
+  else
+  if Sender is THCUndoEditGroupEnd then
+  begin
+    FHScrollBar.Position := (Sender as THCUndoEditGroupEnd).HScrollPos;
+    FVScrollBar.Position := (Sender as THCUndoEditGroupEnd).VScrollPos;
+  end;
+
+  vUndoList := DoGetUndoList;
+  //if vUndoList.Enable then  // 不能判断，因为撤销恢复过程会屏蔽，防止产生新的撤销恢复
+  if not vUndoList.GroupWorking then  // 不在组中处理时才重新设置Data和响应变动
+  begin
+    DataChangeByAction(function(): Boolean
+      begin
+        FData.Redo(Sender);
+      end);
+  end
+  else
+    FData.Redo(Sender);
+end;
+
+procedure THCEdit.DoUndo(const Sender: THCUndo);
+var
+  vUndoList: THCUndoList;
+begin
+  if Sender is THCEditUndo then
+  begin
+    FHScrollBar.Position := (Sender as THCEditUndo).HScrollPos;
+    FVScrollBar.Position := (Sender as THCEditUndo).VScrollPos;
+  end
+  else
+  if Sender is THCUndoEditGroupBegin then
+  begin
+    FHScrollBar.Position := (Sender as THCUndoEditGroupBegin).HScrollPos;
+    FVScrollBar.Position := (Sender as THCUndoEditGroupBegin).VScrollPos;
+  end;
+
+  vUndoList := DoGetUndoList;
+  //if vUndoList.Enable then  // 不能判断，因为撤销恢复过程会屏蔽，防止产生新的撤销恢复
+  if not vUndoList.GroupWorking then  // 不在组中处理时才重新设置Data和响应变动
+  begin
+    DataChangeByAction(function(): Boolean
+      begin
+        FData.Undo(Sender);
+      end);
+  end
+  else
+    FData.Undo(Sender);
+end;
+
+function THCEdit.DoUndoGroupBegin(const AItemNo,
+  AOffset: Integer): THCUndoGroupBegin;
+begin
+  Result := THCUndoEditGroupBegin.Create;
+  (Result as THCUndoEditGroupBegin).HScrollPos := FHScrollBar.Position;
+  (Result as THCUndoEditGroupBegin).VScrollPos := FVScrollBar.Position;
+  Result.Data := FData;
+  Result.CaretDrawItemNo := FData.CaretDrawItemNo;
+end;
+
+function THCEdit.DoUndoGroupEnd(const AItemNo,
+  AOffset: Integer): THCUndoGroupEnd;
+begin
+  Result := THCUndoEditGroupEnd.Create;
+  (Result as THCUndoEditGroupEnd).HScrollPos := FHScrollBar.Position;
+  (Result as THCUndoEditGroupEnd).VScrollPos := FVScrollBar.Position;
+  Result.Data := FData;
+  Result.CaretDrawItemNo := FData.CaretDrawItemNo;
+end;
+
+function THCEdit.DoUndoNew: THCUndo;
+begin
+  Result := THCEditUndo.Create;
+  (Result as THCEditUndo).HScrollPos := FHScrollBar.Position;
+  (Result as THCEditUndo).VScrollPos := FVScrollBar.Position;
+  Result.Data := FData;
+end;
+
+procedure THCEdit.DoDataCheckUpdateInfo;
 begin
   if FUpdateCount = 0 then
     CheckUpdateInfo;
 end;
 
-procedure THCEdit.DoVScrollChange(Sender: TObject; ScrollCode: TScrollCode;
-  var ScrollPos: Integer);
+function THCEdit.DoGetUndoList: THCUndoList;
 begin
-  FStyle.UpdateInfoReCaret;
+  Result := FUndoList;
+end;
+
+procedure THCEdit.DoVScrollChange(Sender: TObject; ScrollCode: TScrollCode;
+  const ScrollPos: Integer);
+begin
   FStyle.UpdateInfoRePaint;
+  FStyle.UpdateInfoReCaret(False);
   CheckUpdateInfo(True);
 //  if Assigned(FOnVerScroll) then
 //    FOnVerScroll(Self);
@@ -349,6 +487,16 @@ procedure THCEdit.EndUpdate;
 begin
   Dec(FUpdateCount);
   DoMapChanged;
+end;
+
+function THCEdit.GetCurParaNo: Integer;
+begin
+  Result := FData.GetTopLevelData.CurStyleNo;
+end;
+
+function THCEdit.GetCurStyleNo: Integer;
+begin
+  Result := FData.GetTopLevelData.CurParaNo;
 end;
 
 function THCEdit.GetDisplayHeight: Integer;
@@ -373,6 +521,17 @@ begin
   Result := DataChangeByAction(function(): Boolean
     begin
       Result := FData.InsertItem(AIndex, AItem);
+    end);
+end;
+
+function THCEdit.InsertTable(const ARowCount, AColCount: Integer): Boolean;
+begin
+  Result := DataChangeByAction(function(): Boolean
+    var
+      vTopData: THCRichData;
+    begin
+      vTopData := FData.GetTopLevelData;
+      vTopData.InsertTable(ARowCount, AColCount);
     end);
 end;
 
@@ -401,6 +560,21 @@ procedure THCEdit.KeyDown(var Key: Word; Shift: TShiftState);
   begin
     Result := (ssCtrl in Shift) and (Key = ord('V')) and not (ssAlt in Shift);
   end;
+
+  function IsSelectAllShortKey: Boolean;
+  begin
+    Result := (Shift = [ssCtrl]) and (Key = ord('A'));
+  end;
+
+  function IsUndoKey: Boolean;
+  begin
+    Result := (Shift = [ssCtrl]) and (Key = ord('Z'));
+  end;
+
+  function IsRedoKey: Boolean;
+  begin
+    Result := (Shift = [ssCtrl]) and (Key = ord('Y'));
+  end;
   {$ENDREGION}
 
 begin
@@ -414,6 +588,15 @@ begin
   if IsPasteShortKey(Key, Shift) then
     Self.Paste
   else
+  if IsSelectAllShortKey then
+    Self.SelectAll
+  else
+  if IsUndoKey then
+    Self.Undo
+  else
+  if IsRedoKey then
+    Self.Redo
+  else
   begin
     FData.KeyDown(Key, Shift);
     case Key of
@@ -421,7 +604,7 @@ begin
         DoChange;
 
       VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_HOME, VK_END:
-        DoSectionDataCheckUpdateInfo;
+        DoDataCheckUpdateInfo;
     end;
   end;
   CheckUpdateInfo;
@@ -430,8 +613,12 @@ end;
 procedure THCEdit.KeyPress(var Key: Char);
 begin
   inherited KeyPress(Key);
-  FData.KeyPress(Key);
-  CheckUpdateInfo;
+  if IsKeyPressWant(Key) then
+  begin
+    FData.KeyPress(Key);
+    DoChange;
+    CheckUpdateInfo;
+  end;
 end;
 
 procedure THCEdit.KeyUp(var Key: Word; Shift: TShiftState);
@@ -440,19 +627,30 @@ begin
   FData.KeyUp(Key, Shift);
 end;
 
+procedure THCEdit.LoadFromFile(const AFileName: string);
+var
+  vStream: TStream;
+begin
+  vStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    LoadFromStream(vStream);
+  finally
+    FreeAndNil(vStream);
+  end;
+end;
+
 procedure THCEdit.LoadFromStream(const AStream: TStream);
 var
-  vFileExt, vFileVersion: string;
+  vFileExt: string;
   viVersion: Word;
+  vLang: Byte;
 begin
   FData.Clear;
   FStyle.Initialize;
   AStream.Position := 0;
-  _LoadFileFormatAndVersion(AStream, vFileExt, vFileVersion);  // 文件格式和版本
+  _LoadFileFormatAndVersion(AStream, vFileExt, viVersion, vLang);  // 文件格式和版本
   if vFileExt <> HC_EXT then
     raise Exception.Create('加载失败，不是' + HC_EXT + '文件！');
-
-  viVersion := GetVersionAsInteger(vFileVersion);
 
   FStyle.LoadFromStream(AStream, viVersion);  // 加载样式表
   FData.LoadFromStream(AStream, FStyle, viVersion);
@@ -463,7 +661,9 @@ procedure THCEdit.MouseDown(Button: TMouseButton; Shift: TShiftState; X,
   Y: Integer);
 begin
   inherited;
-  FData.MouseDown(Button, Shift, X - MinPadding, Y - MinPadding);
+  FData.MouseDown(Button, Shift, X - Self.Padding.Left + FHScrollBar.Position,
+    Y - Self.Padding.Top + FVScrollBar.Position);
+
   CheckUpdateInfo;  // 换光标、切换激活Item
   if Assigned(FOnMouseDown) then
     FOnMouseDown(Self, Button, Shift, X, Y);
@@ -487,14 +687,17 @@ procedure THCEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
 
 begin
   inherited;
-  FData.MouseMove(Shift, X - MinPadding, Y - MinPadding);
+  GCursor := crIBeam;
+  FData.MouseMove(Shift, X - Self.Padding.Left + FHScrollBar.Position,
+    Y - Self.Padding.Top + FVScrollBar.Position);
   if ShowHint then
     ProcessHint;
 
   if FStyle.UpdateInfo.Draging then
-    GCursor := crDrag;
+    Screen.Cursor := crDrag
+  else
+    Cursor := GCursor;
 
-  Cursor := GCursor;
   CheckUpdateInfo;  // 高亮光标下
 end;
 
@@ -503,9 +706,18 @@ procedure THCEdit.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
 begin
   inherited;
   if Button = mbRight then Exit;  // 右键弹出菜单
-  FData.MouseUp(Button, Shift, X - MinPadding, Y - MinPadding);
+  FData.MouseUp(Button, Shift, X - Self.Padding.Left + FHScrollBar.Position,
+    Y - Self.Padding.Top + FVScrollBar.Position);
+
+  if FStyle.UpdateInfo.Draging then
+    Screen.Cursor := crDefault;
+
   Cursor := GCursor;
+
   CheckUpdateInfo;  // 在选中区域中按下不移动弹起鼠标时需要更新
+
+  FStyle.UpdateInfo.Selecting := False;
+  FStyle.UpdateInfo.Draging := False;
 end;
 
 procedure THCEdit.Paint;
@@ -519,8 +731,10 @@ var
   vStream: TMemoryStream;
   vMem: Cardinal;
   vPtr: Pointer;
-  vSize, viVersion: Integer;
-  vFileFormat, vFileVersion: string;
+  vSize: Integer;
+  viVersion: Word;
+  vFileFormat: string;
+  vLang: Byte;
   vStyle: THCStyle;
 begin
   if Clipboard.HasFormat(HC_FILEFORMAT) then
@@ -540,8 +754,7 @@ begin
       end;
       //
       vStream.Position := 0;
-      _LoadFileFormatAndVersion(vStream, vFileFormat, vFileVersion);  // 文件格式和版本
-      viVersion := GetVersionAsInteger(vFileVersion);
+      _LoadFileFormatAndVersion(vStream, vFileFormat, viVersion, vLang);  // 文件格式和版本
       //DoPasteDataBefor(vStream, viVersion);
       vStyle := THCStyle.Create;
       try
@@ -556,19 +769,24 @@ begin
   end
   else
   if Clipboard.HasFormat(CF_TEXT) then
-    FData.InsertText(Clipboard.AsText);
+  begin
+    Self.BeginUpdate;
+    try
+      FData.InsertText(Clipboard.AsText);
+    finally
+      Self.EndUpdate;
+    end;
+  end;
 end;
 
 procedure THCEdit.ReBuildCaret(const AScrollBar: Boolean);
 var
-  vCaretInfo: TCaretInfo;
+  vCaretInfo: THCCaretInfo;
   vDisplayHeight: Integer;
 begin
-  if not Self.Focused then Exit;
-
   if FCaret = nil then Exit;
 
-  if FStyle.UpdateInfo.Draging or FData.SelectExists then
+  if (not Self.Focused) or ((not Style.UpdateInfo.Draging) and FData.SelectExists) then
   begin
     FCaret.Hide;
     Exit;
@@ -585,8 +803,8 @@ begin
     FCaret.Hide;
     Exit;
   end;
-  FCaret.X := vCaretInfo.X - FHScrollBar.Position + MinPadding;
-  FCaret.Y := vCaretInfo.Y - FVScrollBar.Position + MinPadding;
+  FCaret.X := vCaretInfo.X - FHScrollBar.Position + Self.Padding.Left;
+  FCaret.Y := vCaretInfo.Y - FVScrollBar.Position + Self.Padding.Top;
   FCaret.Height := vCaretInfo.Height;
 
   vDisplayHeight := GetDisplayHeight;
@@ -609,10 +827,10 @@ begin
     if FCaret.Height < vDisplayHeight then
     begin
       if FCaret.Y < 0 then
-        FVScrollBar.Position := FVScrollBar.Position + FCaret.Y - MinPadding
+        FVScrollBar.Position := FVScrollBar.Position + FCaret.Y - Self.Padding.Top
       else
-      if FCaret.Y + FCaret.Height + MinPadding > vDisplayHeight then
-        FVScrollBar.Position := FVScrollBar.Position + FCaret.Y + FCaret.Height + MinPadding - vDisplayHeight;
+      if FCaret.Y + FCaret.Height + Self.Padding.Top > vDisplayHeight then
+        FVScrollBar.Position := FVScrollBar.Position + FCaret.Y + FCaret.Height + Self.Padding.Top - vDisplayHeight;
     end;
   end;
 
@@ -623,15 +841,45 @@ begin
   DoCaretChange;
 end;
 
+procedure THCEdit.Redo;
+begin
+  if FUndoList.Enable then  // 恢复过程不要产生新的Redo
+  try
+    FUndoList.Enable := False;
+
+    BeginUpdate;
+    try
+      FUndoList.Redo;
+    finally
+      EndUpdate;
+    end;
+  finally
+    FUndoList.Enable := True;
+  end;
+end;
+
 procedure THCEdit.Resize;
 begin
   inherited;
   FDataBmp.SetSize(GetDisplayWidth, GetDisplayHeight);
-  FData.Width := FDataBmp.Width - MinPadding - MinPadding;
-  if FCaret <> nil then
-    FStyle.UpdateInfoReCaret;
+  FData.Width := FDataBmp.Width - Self.Padding.Left - Self.Padding.Right;
+  FData.ReFormat;
   FStyle.UpdateInfoRePaint;
-  CheckUpdateInfo;
+  if FCaret <> nil then
+    FStyle.UpdateInfoReCaret(False);
+  DoMapChanged;
+end;
+
+procedure THCEdit.SaveToFile(const AFileName: string);
+var
+  vStream: TStream;
+begin
+  vStream := TFileStream.Create(AFileName, fmCreate);
+  try
+    SaveToStream(vStream);
+  finally
+    FreeAndNil(vStream);
+  end;
 end;
 
 procedure THCEdit.SaveToStream(const AStream: TStream);
@@ -640,6 +888,14 @@ begin
   _DeleteUnUsedStyle;  // 删除不使用的样式(可否改为把有用的存了，加载时Item的StyleNo取有用)
   FStyle.SaveToStream(AStream);
   FData.SaveToStream(AStream);
+end;
+
+procedure THCEdit.SelectAll;
+begin
+  FData.SelectAll;
+
+  FStyle.UpdateInfoRePaint;
+  CheckUpdateInfo;
 end;
 
 procedure THCEdit.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
@@ -652,6 +908,28 @@ begin
   FHScrollBar.Top := Height - FHScrollBar.Height;
   FHScrollBar.Width := Width - FVScrollBar.Width;
   FHScrollBar.PageSize := FHScrollBar.Width;
+end;
+
+function THCEdit.TopLevelData: THCRichData;
+begin
+  Result := FData.GetTopLevelData;
+end;
+
+procedure THCEdit.Undo;
+begin
+  if FUndoList.Enable then  // 撤销过程不要产生新的Undo
+  try
+    FUndoList.Enable := False;
+
+    BeginUpdate;
+    try
+      FUndoList.Undo;
+    finally
+      EndUpdate;
+    end;
+  finally
+    FUndoList.Enable := True;
+  end;
 end;
 
 procedure THCEdit.UpdateBuffer;
@@ -672,12 +950,12 @@ begin
 
       vPaintInfo := TPaintInfo.Create;
       try
-        FData.PaintData(MinPadding,  // 当前页数据要绘制到的Left
-          MinPadding,     // 当前页数据要绘制到的Top
-          FData.Height,  // 当前页数据要绘制的Bottom
-          0,     // 界面呈现当前页数据的Top位置
+        FData.PaintData(Self.Padding.Left - FHScrollBar.Position,  // 当前页数据要绘制到的Left
+          Self.Padding.Top,     // 当前页数据要绘制到的Top
+          Self.Padding.Top + FData.Height,  // 当前页数据要绘制的Bottom
+          Self.Padding.Top,     // 界面呈现当前页数据的Top位置
           Self.Height,  // 界面呈现当前页数据Bottom位置
-          0,  // 指定从哪个位置开始的数据绘制到页数据起始位置
+          FVScrollBar.Position,  // 指定从哪个位置开始的数据绘制到页数据起始位置
           FDataBmp.Canvas,
           vPaintInfo);
 
@@ -755,8 +1033,8 @@ begin
           if vS <> '' then
           begin
             FData.InsertText(vS);
-            FStyle.UpdateInfoReCaret;
             FStyle.UpdateInfoRePaint;
+            FStyle.UpdateInfoReCaret;
             CheckUpdateInfo;
           end;
         end;
@@ -804,12 +1082,12 @@ begin
   for i := 0 to FStyle.TextStyles.Count - 1 do
   begin
     FStyle.TextStyles[i].CheckSaveUsed := False;
-    FStyle.TextStyles[i].TempNo := THCStyle.RsNull;
+    FStyle.TextStyles[i].TempNo := THCStyle.Null;
   end;
   for i := 0 to FStyle.ParaStyles.Count - 1 do
   begin
     FStyle.ParaStyles[i].CheckSaveUsed := False;
-    FStyle.ParaStyles[i].TempNo := THCStyle.RsNull;
+    FStyle.ParaStyles[i].TempNo := THCStyle.Null;
   end;
 
   FData.MarkStyleUsed(True);

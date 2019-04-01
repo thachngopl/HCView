@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -30,17 +30,13 @@ type
     procedure SetParaFirst(const Value: Boolean);
   public
     ItemNo,    // 对应的Item
-    CharOffs,  // 从1开始
-    CharLen   // 从CharOffs开始的字符长度
-    //DrawLeft,  // 绘制时屏幕坐标左
-    //DrawRight  // 绘制时屏幕坐标右
+    /// <summary> 从第几个字符开始 >=1 </summary>
+    CharOffs,
+    /// <summary> 从CharOffs开始的字符长度 </summary>
+    CharLen
       : Integer;
-    //CharSpace: Single;  // 分散对齐和两端对齐时，各字符额外间距
-    //RemWidth,  // 所在行右侧结余
-    //RemHeight, // 行中有高度不一致的DItem时，底部对齐额外补充的量
-    //FmtTopOffset
-    //  : Integer;
-    Rect: TRect;  // 在文档中的格式化区域
+    /// <summary> 格式化区域 </summary>
+    Rect: TRect;
     //
     function CharOffsetEnd: Integer;
     function Width: Integer;
@@ -49,28 +45,29 @@ type
     property ParaFirst: Boolean read GetParaFirst write SetParaFirst;
   end;
 
-  THCDrawItems = class(TList)  { TODO : 改为纯List类实现 }
+  THCDrawItems = class(TList)
   private
     // 格式化相关参数
     FDeleteStartDrawItemNo,
-    FDeleteCount,
-    FFormatBeforBottom: Integer;
+    FDeleteCount: Integer;
     function GetItem(Index: Integer): THCCustomDrawItem;
     procedure SetItem(Index: Integer; const Value: THCCustomDrawItem);
   protected
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
+    procedure Clear; override;
     /// <summary> 在格式化前标记要删除的起始和结束DrawItemNo </summary>
     procedure MarkFormatDelete(const AStartDrawItemNo, AEndDrawItemNo: Integer);
+
     /// <summary> 删除格式化前标记的起始和结束DrawItemNo </summary>
     procedure DeleteFormatMark;
+
+    /// <summary> 初始化格式化参数 </summary>
+    procedure ClearFormatMark;
     procedure DeleteRange(const AIndex, ACount: Integer);
     procedure Insert(const AIndex: Integer; const AItem: THCCustomDrawItem);
     function Last: THCCustomDrawItem;
     property Items[Index: Integer]: THCCustomDrawItem read GetItem write SetItem; default;
-
-    /// <summary> 格式化前对应的DrawItem底部位置 </summary>
-    property FormatBeforBottom: Integer read FFormatBeforBottom write FFormatBeforBottom;
   end;
 
 implementation
@@ -120,6 +117,18 @@ end;
 
 { THCDrawItems }
 
+procedure THCDrawItems.Clear;
+begin
+  inherited Clear;
+  ClearFormatMark;
+end;
+
+procedure THCDrawItems.ClearFormatMark;
+begin
+  FDeleteStartDrawItemNo := -1;
+  FDeleteCount := 0;
+end;
+
 procedure THCDrawItems.DeleteFormatMark;
 begin
   Self.DeleteRange(FDeleteStartDrawItemNo, FDeleteCount);
@@ -148,7 +157,7 @@ end;
 
 procedure THCDrawItems.Insert(const AIndex: Integer; const AItem: THCCustomDrawItem);
 begin
-  if FDeleteCount = 0 then
+  if FDeleteCount = 0 then  // 需要删除的已经被下面替换完了
     inherited Insert(AIndex, AItem)
   else
   begin
@@ -174,7 +183,8 @@ procedure THCDrawItems.Notify(Ptr: Pointer; Action: TListNotification);
 begin
   if Action = TListNotification.lnDeleted then
     THCCustomDrawItem(Ptr).Free;
-  inherited;
+
+  inherited Notify(Ptr, Action);
 end;
 
 procedure THCDrawItems.SetItem(Index: Integer; const Value: THCCustomDrawItem);

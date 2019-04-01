@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -21,12 +21,16 @@ const
 
 type
   TOrientation = (oriHorizontal, oriVertical);
+
   TScrollCode = (scLineUp, scLineDown, scPageUp, scPageDown, scPosition,
     scTrack, scTop, scBottom, scEndScroll);
+
   TScrollEvent = procedure(Sender: TObject; ScrollCode: TScrollCode;
-    var ScrollPos: Integer) of object;
+    const ScrollPos: Integer) of object;
+
   TBarControl = (cbcBar, cbcLeftBtn, cbcThum, cbcRightBtn);
-  THCScrollBar = class(TCustomControl)  // 为实现滚动条上按下拖动到控件外也能继续滚动,使用 SetCapture 需要句柄
+
+  THCScrollBar = class(TGraphicControl)  // 为实现滚动条上按下拖动到控件外也能继续滚动,使用 SetCapture 需要句柄
   private
     /// <summary> 滚动条位置的最小值 </summary>
     FMin,
@@ -67,7 +71,7 @@ type
     /// <summary>
     /// 水平滚动条对应右按钮，垂直滚动条对应下按钮
     /// </summary>
-    FRightBtnRect: Trect;
+    FRightBtnRect: TRect;
 
     FOnVisibleChanged: TNotifyEvent;
 
@@ -116,11 +120,12 @@ type
     /// </summary>
     /// <param name="Value">移动范围</param>
     procedure SetBtnStep(const Value: Integer);
+
+    procedure UpdateRangRect;
   protected
     procedure Resize; override;
     procedure SetBounds(ALeft, ATop, AWidth, AHeight: Integer); override;
     procedure ScrollStep(ScrollCode: TScrollCode);
-    destructor Destroy; override;
     procedure Paint; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState;
       X, Y: Integer); override;
@@ -133,6 +138,8 @@ type
     property Percent: Single read FPercent write FPercent;
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure PaintToEx(const ACanvas: TCanvas);
     property Max: Integer read FMax write SetMax;
     property Min: Integer read FMin write SetMin;
     property Rang: Integer read FRange;
@@ -146,15 +153,14 @@ type
 
 implementation
 
-{$R HCScrollBar.RES}
-
 uses
   Math;
 
 const
   LineColor = clMedGray;
   IconWidth = 16;
-  TitleBackColor = $E8FFDF;
+  TitleBackColor = $B3ABAA;
+  ThumBackColor = $D5D1D0;
 
 { THCScrollBar }
 
@@ -169,6 +175,7 @@ begin
   //
   Width := 20;
   Height := 20;
+  Cursor := crArrow;  // crDefault为什么不行？
 end;
 
 destructor THCScrollBar.Destroy;
@@ -208,10 +215,10 @@ begin
   begin
     FMouseDownControl := cbcBar;  // 滚动条其他区域类型
     if (FThumRect.Top > Y) or (FThumRect.Left > X) then
-        ScrollStep(scPageUp)  // 数据向上（左）翻页
+      ScrollStep(scPageUp)  // 数据向上（左）翻页
     else
     if (FThumRect.Bottom < Y) or (FThumRect.Right < X) then
-        ScrollStep(scPageDown);  // 数据向下（右）翻页
+      ScrollStep(scPageDown);  // 数据向下（右）翻页
   end;
 end;
 
@@ -250,105 +257,107 @@ begin
 end;
 
 procedure THCScrollBar.Paint;
+begin
+  PaintToEx(Canvas);
+end;
+
+procedure THCScrollBar.PaintToEx(const ACanvas: TCanvas);
 var
   vRect: TRect;
-  vIcon: HICON;
 begin
-  Canvas.Brush.Style := bsSolid;
-  Canvas.Brush.Color := TitleBackColor;
-  Canvas.FillRect(Bounds(0, 0, Width, Height));
+  ACanvas.Brush.Color := TitleBackColor;
+  ACanvas.FillRect(Bounds(0, 0, Width, Height));
   case FOrientation of
     oriHorizontal:  // 水平滚动条
       begin
-        // 水平滚动条左按钮
-        vRect := FLeftBtnRect;
-        //ACanvas.Brush.Color := GTitleForegColor;
-        //ACanvas.FillRect(vRect);
-        //vIcon := LoadIcon(HInstance, 'DROPLEFT');
-        vIcon := LoadImage(HInstance, 'DROPLEFT', IMAGE_ICON, IconWidth, IconWidth, LR_DEFAULTCOLOR);
-        try
-          DrawIconEx(Canvas.Handle, vRect.Left + (vRect.Right - vRect.Left - IconWidth) div 2,
-            vRect.Top + (vRect.Bottom - vRect.Top - IconWidth) div 2, vIcon, IconWidth, IconWidth, 0, 0, DI_NORMAL);
-        finally
-          DestroyIcon(vIcon);  // 释放，防止GDI对象泄露
-        end;
+        // 左按钮
+        ACanvas.Pen.Color := clWhite;
+        vRect.Left := FLeftBtnRect.Left + ((FLeftBtnRect.Right - FLeftBtnRect.Left) - 4) div 2 + 4;
+        vRect.Top := FLeftBtnRect.Top + ((FLeftBtnRect.Bottom - FLeftBtnRect.Top) - 7) div 2;
+        ACanvas.MoveTo(vRect.Left, vRect.Top);
+        ACanvas.LineTo(vRect.Left, vRect.Top + 7);
+        ACanvas.MoveTo(vRect.Left - 1, vRect.Top + 1);
+        ACanvas.LineTo(vRect.Left - 1, vRect.Top + 6);
+        ACanvas.MoveTo(vRect.Left - 2, vRect.Top + 2);
+        ACanvas.LineTo(vRect.Left - 2, vRect.Top + 5);
+        ACanvas.MoveTo(vRect.Left - 3, vRect.Top + 3);
+        ACanvas.LineTo(vRect.Left - 3, vRect.Top + 4);
 
-        // 水平滚动条右按钮
-        vRect := FRightBtnRect;
-        //ACanvas.FillRect(vRect);
-        //vIcon := LoadIcon(HInstance, 'DROPRIGHT');
-        vIcon := LoadImage(HInstance, 'DROPRIGHT', IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
-        try
-          DrawIconEx(Canvas.Handle, vRect.Left + (vRect.Right - vRect.Left - IconWidth) div 2,
-            vRect.Top + (vRect.Bottom - vRect.Top - IconWidth) div 2, vIcon, IconWidth, IconWidth, 0, 0, DI_NORMAL);
-        finally
-          DestroyIcon(vIcon);  // 释放，防止GDI对象泄露
-        end;
+        // 右按钮
+        vRect.Left := FRightBtnRect.Left + ((FRightBtnRect.Right - FRightBtnRect.Left) - 4) div 2;
+        vRect.Top := FRightBtnRect.Top + ((FRightBtnRect.Bottom - FRightBtnRect.Top) - 7) div 2;
+        ACanvas.MoveTo(vRect.Left, vRect.Top);
+        ACanvas.LineTo(vRect.Left, vRect.Top + 7);
+        ACanvas.MoveTo(vRect.Left + 1, vRect.Top + 1);
+        ACanvas.LineTo(vRect.Left + 1, vRect.Top + 6);
+        ACanvas.MoveTo(vRect.Left + 2, vRect.Top + 2);
+        ACanvas.LineTo(vRect.Left + 2, vRect.Top + 5);
+        ACanvas.MoveTo(vRect.Left + 3, vRect.Top + 3);
+        ACanvas.LineTo(vRect.Left + 3, vRect.Top + 4);
 
         // 水平滑块
         vRect := FThumRect;
         InflateRect(vRect, 0, -1);
 
-        DoDrawThumBefor(Canvas, vRect);
+        DoDrawThumBefor(ACanvas, vRect);
 
-        Canvas.Brush.Color := TitleBackColor;
-        Canvas.Pen.Color := LineColor;
-        Canvas.Rectangle(vRect);
+        ACanvas.Brush.Color := ThumBackColor;
+        ACanvas.Pen.Color := LineColor;
+        ACanvas.Rectangle(vRect);
         // 滑块上的修饰
         vRect.Left := vRect.Left + (vRect.Right - vRect.Left) div 2;
-        Canvas.MoveTo(vRect.Left, 5);
-        Canvas.LineTo(vRect.Left, Height - 5);
-        Canvas.MoveTo(vRect.Left + 3, 5);
-        Canvas.LineTo(vRect.Left + 3, Height - 5);
-        Canvas.MoveTo(vRect.Left - 3, 5);
-        Canvas.LineTo(vRect.Left - 3, Height - 5);
+        ACanvas.MoveTo(vRect.Left, 5);
+        ACanvas.LineTo(vRect.Left, Height - 5);
+        ACanvas.MoveTo(vRect.Left + 3, 5);
+        ACanvas.LineTo(vRect.Left + 3, Height - 5);
+        ACanvas.MoveTo(vRect.Left - 3, 5);
+        ACanvas.LineTo(vRect.Left - 3, Height - 5);
       end;
 
     oriVertical:  // 垂直滚动条
       begin
         // 上按钮
-        vRect := FLeftBtnRect;
-        //ACanvas.Brush.Color := GTitleForegColor;
-        //ACanvas.FillRect(vRect);
-        //vIcon := LoadIcon(HInstance, 'DROPUP');
-        vIcon := LoadImage(HInstance, 'DROPUP', IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
-        try
-          DrawIconEx(Canvas.Handle, vRect.Left + (vRect.Right - vRect.Left - IconWidth) div 2,
-            vRect.Top + (vRect.Bottom - vRect.Top - IconWidth) div 2, vIcon, IconWidth, IconWidth, 0, 0, DI_NORMAL);
-        finally
-          DestroyIcon(vIcon);  // 释放，防止GDI对象泄露
-        end;
+        ACanvas.Pen.Color := clWhite;
+        vRect.Left := FLeftBtnRect.Left + ((FLeftBtnRect.Right - FLeftBtnRect.Left) - 7) div 2;
+        vRect.Top := FLeftBtnRect.Top + ((FLeftBtnRect.Bottom - FLeftBtnRect.Top) - 4) div 2 + 4;
+        ACanvas.MoveTo(vRect.Left, vRect.Top);
+        ACanvas.LineTo(vRect.Left + 7, vRect.Top);
+        ACanvas.MoveTo(vRect.Left + 1, vRect.Top - 1);
+        ACanvas.LineTo(vRect.Left + 6, vRect.Top - 1);
+        ACanvas.MoveTo(vRect.Left + 2, vRect.Top - 2);
+        ACanvas.LineTo(vRect.Left + 5, vRect.Top - 2);
+        ACanvas.MoveTo(vRect.Left + 3, vRect.Top - 3);
+        ACanvas.LineTo(vRect.Left + 4, vRect.Top - 3);
 
         // 下按钮
-        vRect := FRightBtnRect;
-        Canvas.FillRect(vRect);
-        //vIcon := LoadIcon(HInstance, 'DROPDOWN');
-        vIcon := LoadImage(HInstance, 'DROPDOWN', IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
-        try
-          DrawIconEx(Canvas.Handle, vRect.Left + (vRect.Right - vRect.Left - IconWidth) div 2,
-            vRect.Top + (vRect.Bottom - vRect.Top - IconWidth) div 2, vIcon, IconWidth, IconWidth, 0, 0, DI_NORMAL);
-        finally
-          DestroyIcon(vIcon);  // 释放，防止GDI对象泄露
-        end;
+        vRect.Left := FRightBtnRect.Left + ((FRightBtnRect.Right - FRightBtnRect.Left) - 7) div 2;
+        vRect.Top := FRightBtnRect.Top + ((FRightBtnRect.Bottom - FRightBtnRect.Top) - 4) div 2;
+        ACanvas.MoveTo(vRect.Left, vRect.Top);
+        ACanvas.LineTo(vRect.Left + 7, vRect.Top);
+        ACanvas.MoveTo(vRect.Left + 1, vRect.Top + 1);
+        ACanvas.LineTo(vRect.Left + 6, vRect.Top + 1);
+        ACanvas.MoveTo(vRect.Left + 2, vRect.Top + 2);
+        ACanvas.LineTo(vRect.Left + 5, vRect.Top + 2);
+        ACanvas.MoveTo(vRect.Left + 3, vRect.Top + 3);
+        ACanvas.LineTo(vRect.Left + 4, vRect.Top + 3);
 
         // 滑块
         vRect := FThumRect;
         InflateRect(vRect, -1, 0);
-        //vRect.Right := vRect.Right - 1;
 
-        DoDrawThumBefor(Canvas, vRect);
+        DoDrawThumBefor(ACanvas, vRect);
 
-        Canvas.Brush.Color := TitleBackColor;
-        Canvas.Pen.Color := LineColor;
-        Canvas.Rectangle(vRect);
+        ACanvas.Brush.Color := ThumBackColor;
+        ACanvas.Pen.Color := LineColor;
+        ACanvas.Rectangle(vRect);
         // 滑块上的修饰
         vRect.Top := vRect.Top + (vRect.Bottom - vRect.Top) div 2;
-        Canvas.MoveTo(5, vRect.Top);
-        Canvas.LineTo(Width - 5, vRect.Top);
-        Canvas.MoveTo(5, vRect.Top - 3);
-        Canvas.LineTo(Width - 5, vRect.Top - 3);
-        Canvas.MoveTo(5, vRect.Top + 3);
-        Canvas.LineTo(Width - 5, vRect.Top + 3);
+        ACanvas.MoveTo(5, vRect.Top);
+        ACanvas.LineTo(Width - 5, vRect.Top);
+        ACanvas.MoveTo(5, vRect.Top - 3);
+        ACanvas.LineTo(Width - 5, vRect.Top - 3);
+        ACanvas.MoveTo(5, vRect.Top + 3);
+        ACanvas.LineTo(Width - 5, vRect.Top + 3);
       end;
   end;
 end;
@@ -433,13 +442,7 @@ end;
 
 procedure THCScrollBar.Resize;
 begin
-  inherited;
-  if FOrientation = oriVertical then
-    Self.FPageSize := Height
-  else
-    Self.FPageSize := Width;
-  ReCalcThumRect;  // 重新计算滑块区域
-  ReCalcButtonRect;  // 重新计算按钮区域
+  inherited Resize;
 end;
 
 procedure THCScrollBar.ScrollStep(ScrollCode: TScrollCode);
@@ -509,8 +512,18 @@ end;
 
 procedure THCScrollBar.SetBounds(ALeft, ATop, AWidth, AHeight: Integer);
 begin
-  inherited; // 初始是水平时一次SetOrientation也不能触发，所以需要在大小变化时计算
-  ReCalcThumRect;  // 重新计算相对比率（相对Max - Min）
+  inherited SetBounds(ALeft, ATop, AWidth, AHeight);
+
+  if FOrientation = oriVertical then
+    Self.FPageSize := Height
+  else
+    Self.FPageSize := Width;
+
+  if FPosition + FPageSize > FMax then  // 大小变化后，需要重新确定Position
+    FPosition := Math.Max(FMax - FPageSize, FMin);
+
+  ReCalcThumRect;  // 重新计算滑块区域
+  ReCalcButtonRect;  // 重新计算按钮区域
 end;
 
 procedure THCScrollBar.SetBtnStep(const Value: Integer);
@@ -533,7 +546,7 @@ begin
 
     FRange := FMax - FMin;
     ReCalcThumRect;  // 滑块区域
-    //UpdateDirectUI;  // 重绘
+    UpdateRangRect;  // 重绘
   end;
 end;
 
@@ -549,7 +562,7 @@ begin
       FPosition := FMin;
     FRange := FMax - FMin;
     ReCalcThumRect;  // 滑块区域
-    //UpdateDirectUI;  // 重绘
+    UpdateRangRect;  // 重绘
   end;
 end;
 
@@ -569,7 +582,7 @@ begin
     end;
     ReCalcButtonRect;
     ReCalcThumRect;
-    //UpdateDirectUI;  // 重绘
+    UpdateRangRect;  // 重绘
   end;
 end;
 
@@ -578,8 +591,9 @@ begin
   if FPageSize <> Value then
   begin
     FPageSize := Value;
+    //ReCalcButtonRect;
     ReCalcThumRect;  // 重新计算相对比率（相对Max - Min）
-    //UpdateDirectUI;  // 重绘 当其所有者大小改变时，造成系统中窗体后面的窗体闪烁
+    UpdateRangRect;  // 重绘
   end;
 end;
 
@@ -595,15 +609,30 @@ begin
   else
     vPos := Value;
 
-
   if FPosition <> vPos then
   begin
     FPosition := vPos;
     ReCalcThumRect;  // 滑块区域
+    //Repaint;
+    UpdateRangRect;  // 重绘
+
     if Assigned(FOnScroll) then  // 滚动
       FOnScroll(Self, scPosition, FPosition);
+  end;
+end;
 
-    Repaint;
+procedure THCScrollBar.UpdateRangRect;
+var
+  vRect: TRect;
+begin
+  //if HandleAllocated then
+  if Assigned(Parent) and Parent.HandleAllocated then
+  begin
+    vRect := ClientRect;
+    OffsetRect(vRect, Left, Top);
+    InvalidateRect(Parent.Handle, vRect, False);
+    UpdateWindow(Parent.Handle);
+    //RedrawWindow(Handle, nil, 0, RDW_INVALIDATE);
   end;
 end;
 

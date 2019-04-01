@@ -33,11 +33,13 @@ object frmHCEdit: TfrmHCEdit
       Top = 0
       Caption = 'btnOpen'
       ImageIndex = 6
+      OnClick = btnOpenClick
     end
     object btnSave: TToolButton
       Left = 24
       Top = 0
       ImageIndex = 7
+      OnClick = btnSaveClick
     end
     object btnprint: TToolButton
       Left = 48
@@ -290,7 +292,7 @@ object frmHCEdit: TfrmHCEdit
     Left = 72
     Top = 56
     Bitmap = {
-      494C01011B001D000C0010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
+      494C01011B001D001C0010001000FFFFFFFF2110FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000007000000001002000000000000070
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
@@ -1270,6 +1272,7 @@ object frmHCEdit: TfrmHCEdit
       Caption = #34920#26684
       object mniInsertTable: TMenuItem
         Caption = #25554#20837
+        OnClick = mniInsertTableClick
       end
       object mniN16: TMenuItem
         Caption = #21512#24182
@@ -1285,6 +1288,7 @@ object frmHCEdit: TfrmHCEdit
       end
       object mniN9: TMenuItem
         Caption = #22270#29255
+        OnClick = mniN9Click
       end
       object mniN13: TMenuItem
         Caption = #20844#24335
@@ -1314,8 +1318,8 @@ object frmHCEdit: TfrmHCEdit
     Top = 56
   end
   object pmRichEdit: TPopupMenu
-    Left = 264
-    Top = 64
+    Left = 176
+    Top = 56
     object mniN7: TMenuItem
       Caption = #21098#20999
     end
@@ -1357,7 +1361,7 @@ object frmHCEdit: TfrmHCEdit
     end
   end
   object pmLineSpace: TPopupMenu
-    Left = 424
+    Left = 248
     Top = 56
     object mniLineSpace: TMenuItem
       Caption = '1.0'

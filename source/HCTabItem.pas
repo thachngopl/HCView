@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -14,34 +14,39 @@ unit HCTabItem;
 interface
 
 uses
-  Windows, Controls, Classes, Graphics, HCItem, HCRectItem, HCStyle, HCCommon;
+  Windows, Controls, Classes, Graphics, HCItem, HCRectItem, HCStyle, HCCommon,
+  HCCustomData;
 
 type
-  TTabItem = class(THCCustomRectItem)
+  TTabItem = class(THCTextRectItem)
   protected
+    procedure DoPaint(const AStyle: THCStyle; const ADrawRect: TRect;
+      const ADataDrawTop, ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
+      const ACanvas: TCanvas; const APaintInfo: TPaintInfo); override;
+  public
+    constructor Create(const AOwnerData: THCCustomData); override;
     function JustifySplit: Boolean; override;
     function GetOffsetAt(const X: Integer): Integer; override;
-    procedure DoPaint(const AStyle: THCStyle; const ADrawRect: TRect; const ADataDrawBottom,
-      ADataScreenTop, ADataScreenBottom: Integer; const ACanvas: TCanvas;
-      const APaintInfo: TPaintInfo); override;
-  public
-    constructor Create(const AWidth, AHeight: Integer); override;
   end;
 
 implementation
 
 { TTabItem }
 
-constructor TTabItem.Create(const AWidth, AHeight: Integer);
+constructor TTabItem.Create(const AOwnerData: THCCustomData);
+var
+  vSize: TSize;
 begin
-  inherited Create;
-  StyleNo := THCStyle.RsTab;
-  Width := AWidth;
-  Height := AHeight;
+  inherited Create(AOwnerData);
+  StyleNo := THCStyle.Tab;
+  AOwnerData.Style.ApplyTempStyle(TextStyleNo);
+  vSize := AOwnerData.Style.TempCanvas.TextExtent('汉字');  // 默认2个汉字
+  Width := vSize.cx;
+  Height := vSize.cy;
 end;
 
 procedure TTabItem.DoPaint(const AStyle: THCStyle; const ADrawRect: TRect;
-  const ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
+  const ADataDrawTop, ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 begin
   inherited;

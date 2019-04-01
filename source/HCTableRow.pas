@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -14,18 +14,18 @@ unit HCTableRow;
 interface
 
 uses
-  HCCustomData, HCTableCell, HCTableCellData, HCStyle;
+  HCCustomData, HCTableCell, HCTableCellData, HCStyle, HCXml;
 
 const
   MinRowHeight = 20;
-  MinColWidth = 10;
+  MinColWidth = 20;  // 如果修改要和左缩进离边距的最小值匹配
   MaxListSize = Maxint div 16;
 
 type
   PPointerList = ^TPointerList;
   TPointerList = array[0..MaxListSize] of Pointer;
 
-  TTableRow = class(TObject)
+  THCTableRow = class(TObject)
   private
     FList: PPointerList;
     FColCount,
@@ -39,7 +39,7 @@ type
     procedure SetItems(Index: Integer; const Value: Pointer);
     procedure SetColCount(const Value: Integer);
   protected
-    function GetCols(Index: Integer): TTableCell;
+    function GetCols(Index: Integer): THCTableCell;
 
     property Items[Index: Integer]: Pointer read GetItems write SetItems; default;
   public
@@ -49,20 +49,22 @@ type
     function Insert(Index: Integer; Item: Pointer): Boolean;
     procedure Clear;
     procedure Delete(Index: Integer);
-    function ClearFormatExtraHeight: Integer;
     //
     //function CalcFormatHeight: Integer;
     procedure SetRowWidth(const AWidth: Integer);
-    procedure SetHeightEx(const Value: Integer);  // 外部拖动改变行高
+    procedure SetHeight(const Value: Integer);  // 外部拖动改变行高
+
+    procedure ToXml(const ANode: IHCXMLNode);
+    procedure ParseXml(const ANode: IHCXMLNode);
 
     //property Capacity: Integer read FCapacity write SetCapacity;
     property ColCount: Integer read FColCount write SetColCount;
     //property List: PCellDataList read FList;
     //
-    property Cols[Index: Integer]: TTableCell read GetCols;
+    property Cols[Index: Integer]: THCTableCell read GetCols;
 
     /// <summary> 当前行中所有没有发生合并单元格的高度(含CellVPadding * 2因为会受有合并列的影响，所以>=数据高度) </summary>
-    property Height: Integer read FHeight write FHeight;
+    property Height: Integer read FHeight write SetHeight;
     property AutoHeight: Boolean read FAutoHeight write FAutoHeight;
 
     /// <summary>因跨页向下整体偏移的量</summary>
@@ -74,9 +76,9 @@ implementation
 uses
   SysUtils, Math;
 
-{ TTableRow }
+{ THCTableRow }
 
-function TTableRow.Add(Item: Pointer): Integer;
+function THCTableRow.Add(Item: Pointer): Integer;
 begin
   if FColCount = FCapacity then
     SetCapacity(FCapacity + 4);  // 每次扩充4个
@@ -85,7 +87,7 @@ begin
   Inc(FColCount);
 end;
 
-function TTableRow.Insert(Index: Integer; Item: Pointer): Boolean;
+function THCTableRow.Insert(Index: Integer; Item: Pointer): Boolean;
 begin
   if (Index < 0) or (Index > FColCount) then
     raise Exception.CreateFmt('[Insert]非法数据:%d', [Index]);
@@ -99,7 +101,17 @@ begin
   Result := True;
 end;
 
-procedure TTableRow.SetRowWidth(const AWidth: Integer);
+procedure THCTableRow.ParseXml(const ANode: IHCXMLNode);
+var
+  i: Integer;
+begin
+  FAutoHeight := ANode.Attributes['autoheight'];
+  FHeight := ANode.Attributes['height'];
+  for i := 0 to ANode.ChildNodes.Count - 1 do
+    Cols[i].ParseXml(ANode.ChildNodes[i]);
+end;
+
+procedure THCTableRow.SetRowWidth(const AWidth: Integer);
 var
   i, vWidth: Integer;
 begin
@@ -118,7 +130,18 @@ begin
   Cols[FColCount - 1].Width := AWidth - (FColCount - 1) * vWidth;  // 结余的全部给最后一个单元格
 end;
 
-{function TTableRow.CalcFormatHeight: Integer;
+procedure THCTableRow.ToXml(const ANode: IHCXMLNode);
+var
+  i: Integer;
+begin
+  ANode.Attributes['autoheight'] := FAutoHeight;
+  ANode.Attributes['height'] := FHeight;
+
+  for i := 0 to FColCount - 1 do  // 各列数据
+    Cols[i].ToXml(ANode.AddChild('cell'));
+end;
+
+{function THCTableRow.CalcFormatHeight: Integer;
 var
   i, vH: Integer;
 begin
@@ -136,76 +159,56 @@ begin
   end;
 end;}
 
-procedure TTableRow.Clear;
+procedure THCTableRow.Clear;
 begin
   SetColCount(0);
   SetCapacity(0);
 end;
 
-constructor TTableRow.Create(const AStyle: THCStyle; const AColCount: Integer);
+constructor THCTableRow.Create(const AStyle: THCStyle; const AColCount: Integer);
 var
-  vCell: TTableCell;
+  vCell: THCTableCell;
   i: Integer;
 begin
   FColCount := 0;
   FCapacity := 0;
   for i := 0 to AColCount - 1 do
   begin
-    vCell := TTableCell.Create(AStyle);
+    vCell := THCTableCell.Create(AStyle);
     Add(vCell);
   end;
   FAutoHeight := True;
 end;
 
-procedure TTableRow.Delete(Index: Integer);
+procedure THCTableRow.Delete(Index: Integer);
 begin
   if (Index < 0) or (Index >= FColCount) then
     raise Exception.CreateFmt('[Delete]非法的 Index:%d', [Index]);
-  TTableCell(FList^[Index]).Free;
+  THCTableCell(FList^[Index]).Free;
   if Index < FColCount then
     System.Move(FList^[Index + 1], FList^[Index], (FColCount - Index) * SizeOf(Pointer));
   Dec(FColCount);
 end;
 
-destructor TTableRow.Destroy;
+destructor THCTableRow.Destroy;
 begin
   Clear;
   inherited;
 end;
 
-function TTableRow.GetCols(Index: Integer): TTableCell;
+function THCTableRow.GetCols(Index: Integer): THCTableCell;
 begin
-  Result := TTableCell(Items[Index]);
+  Result := THCTableCell(Items[Index]);
 end;
 
-function TTableRow.ClearFormatExtraHeight: Integer;
-var
-  i, vMaxDiff: Integer;
-begin
-  Result := FFmtOffset;
-  FFmtOffset := 0;
-  vMaxDiff := 0;
-  for i := 0 to ColCount - 1 do
-    vMaxDiff := Max(vMaxDiff, Cols[i].ClearFormatExtraHeight);
-
-  if vMaxDiff > 0 then
-  begin
-    for i := 0 to ColCount - 1 do
-      Self.Cols[i].Height := Self.Cols[i].Height - vMaxDiff;
-    FHeight := FHeight - vMaxDiff;
-  end;
-
-  Result := Result + vMaxDiff;
-end;
-
-function TTableRow.GetItems(Index: Integer): Pointer;
+function THCTableRow.GetItems(Index: Integer): Pointer;
 begin
   if (Index < 0) or (Index >= FColCount) then
-    raise Exception.CreateFmt('异常:[TTableRow.GetItems]参数Index值%d超出范围！', [Index]);
+    raise Exception.CreateFmt('异常:[THCTableRow.GetItems]参数Index值%d超出范围！', [Index]);
   Result := FList^[Index];
 end;
 
-procedure TTableRow.SetCapacity(const Value: Integer);
+procedure THCTableRow.SetCapacity(const Value: Integer);
 begin
   if (Value < FColCount) or (Value > MaxListSize) then
     raise Exception.CreateFmt('[SetCapacity]非法数据:%d', [Value]);
@@ -219,7 +222,7 @@ begin
   end;
 end;
 
-procedure TTableRow.SetColCount(const Value: Integer);
+procedure THCTableRow.SetColCount(const Value: Integer);
 var
   i: Integer;
 begin
@@ -235,29 +238,33 @@ begin
   FColCount := Value;
 end;
 
-procedure TTableRow.SetHeightEx(const Value: Integer);
+procedure THCTableRow.SetHeight(const Value: Integer);
 var
-  i: Integer;
+  i, vMaxDataHeight: Integer;
 begin
-  // 找行中最高的单元格
-  for i := 0 to FColCount - 1 do
+  if FHeight <> Value then
   begin
-    if Cols[i].CellData <> nil then
+    vMaxDataHeight := 0;
+    for i := 0 to FColCount - 1 do  // 找行中最高的单元格
     begin
-      if Cols[i].CellData.Height > FHeight then
-        FHeight := Cols[i].CellData.Height;
+      if (Cols[i].CellData <> nil) and (Cols[i].RowSpan = 0) then  // 不是被合并的单元格，不是行合并的行单元格
+      begin
+        if Cols[i].CellData.Height > vMaxDataHeight then
+          vMaxDataHeight := Cols[i].CellData.Height;
+      end;
     end;
-  end;
-  if FHeight < Value then  // 处理行中最高内容是否能放下
-    FHeight := Value;
-  for i := 0 to FColCount - 1 do
-  begin
-    if Cols[i].CellData.Height > FHeight then
+
+    if vMaxDataHeight < Value then  // 设置的高度大于最高内容，以设置的为准(这里应该是Data高度+上下FCellVPadding和Value比更准确)
+      FHeight := Value
+    else
+      FHeight := vMaxDataHeight;
+
+    for i := 0 to FColCount - 1 do
       Cols[i].Height := FHeight;
   end;
 end;
 
-procedure TTableRow.SetItems(Index: Integer; const Value: Pointer);
+procedure THCTableRow.SetItems(Index: Integer; const Value: Pointer);
 begin
   if (Index < 0) or (Index >= FColCount) then
     raise Exception.CreateFmt('[SetItems]异常:%d', [Index]);

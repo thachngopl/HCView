@@ -1,6 +1,6 @@
 {*******************************************************}
 {                                                       }
-{               HCView V1.0  作者：荆通                 }
+{               HCView V1.1  作者：荆通                 }
 {                                                       }
 {      本代码遵循BSD协议，你可以加入QQ群 649023932      }
 {            来获取更多的技术交流 2018-5-4              }
@@ -14,10 +14,20 @@ unit HCItem;
 interface
 
 uses
-  Windows, Classes, Controls, Graphics, Generics.Collections, HCStyle;
+  Windows, Classes, Controls, Graphics, Generics.Collections, HCStyle, HCUndo, HCXml;
 
 type
+  TScaleInfo = record
+    MapMode: Integer;
+    WindowOrg: TSize;
+    WindowExt: TSize;
+    ViewportOrg: TSize;
+    ViewportExt: TSize;
+  end;
+
   TItemOptions = set of (ioParaFirst, ioSelectPart, ioSelectComplate);
+
+  THCItemAction = (hiaRemove, hiaInsertChar, hiaBackDeleteChar, hiaDeleteChar);
 
   THCCustomItemClass = class of THCCustomItem;
 
@@ -27,13 +37,40 @@ type
   private
     FPrint: Boolean;
     FTopItems: TObjectList<THCCustomItem>;
+    FWindowWidth, FWindowHeight: Integer;
+    FScaleX, FScaleY,  // 目标画布和显示器画布dpi比例(打印机dpi和显示器dpi不一致时的缩放比例)
+    FZoom  // 视图设置的放大比例
+      : Single;
+    // 如果要将ADataDrawLeft, ADataDrawBottom, ADataScreenTop, ADataScreenBottom,
+    // 等信息增加到此类中，需要设计表格单元格Data绘制时和页面Data的这几个值不一样
+    // 需要不停的修改此类中这几个参数
   public
-    constructor Create;
+    constructor Create; virtual;
     destructor Destroy; override;
+    function ScaleCanvas(const ACanvas: TCanvas): TScaleInfo;
+    procedure RestoreCanvasScale(const ACanvas: TCanvas; const AOldInfo: TScaleInfo);
+    function GetScaleX(const AValue: Integer): Integer;
+    function GetScaleY(const AValue: Integer): Integer;
+    procedure DrawNoScaleLine(const ACanvas: TCanvas; const APoints: array of TPoint);
+
     property Print: Boolean read FPrint write FPrint;
 
     /// <summary> 只管理不负责释放 </summary>
     property TopItems: TObjectList<THCCustomItem> read FTopItems;
+
+    /// <summary> 用于绘制的区域高度 </summary>
+    property WindowWidth: Integer read FWindowWidth write FWindowWidth;
+
+    /// <summary> 用于绘制的区域宽度 </summary>
+    property WindowHeight: Integer read FWindowHeight write FWindowHeight;
+
+    /// <summary> 横向缩放 </summary>
+    property ScaleX: Single read FScaleX write FScaleX;
+
+    /// <summary> 纵向缩放 </summary>
+    property ScaleY: Single read FScaleY write FScaleY;
+
+    property Zoom: Single read FZoom write FZoom;
   end;
 
   THCCustomItem = class(TObject)
@@ -50,25 +87,25 @@ type
     function GetSelectPart: Boolean;
     function GetText: string; virtual;
     procedure SetText(const Value: string); virtual;
+    function GetHyperLink: string; virtual;
+    procedure SetHyperLink(const Value: string); virtual;
     procedure SetActive(const Value: Boolean); virtual;
     function GetLength: Integer; virtual;
     procedure DoPaint(const AStyle: THCStyle; const ADrawRect: TRect;
-      const ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
+      const ADataDrawTop, ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
       const ACanvas: TCanvas; const APaintInfo: TPaintInfo); virtual;
   public
     constructor Create; virtual;
 
     procedure Assign(Source: THCCustomItem); virtual;
-    /// <summary>
-    /// 绘制Item的事件
-    /// </summary>
+    /// <summary> 绘制Item的事件 </summary>
     /// <param name="ACanvas"></param>
     /// <param name="ADrawRect">当前DrawItem的区域</param>
     /// <param name="ADataDrawBottom">Item所在的Data本次绘制底部位置</param>
     /// <param name="ADataScreenTop"></param>
     /// <param name="ADataScreenBottom"></param>
     procedure PaintTo(const AStyle: THCStyle; const ADrawRect: TRect;
-      const APageDataDrawBottom, APageDataScreenTop, APageDataScreenBottom: Integer;
+      const APageDataDrawTop, APageDataDrawBottom, APageDataScreenTop, APageDataScreenBottom: Integer;
       const ACanvas: TCanvas; const APaintInfo: TPaintInfo); virtual; final;  // 不可继承
 
     procedure PaintTop(const ACanvas: TCanvas); virtual;
@@ -93,6 +130,8 @@ type
     function GetHint: string; virtual;
     procedure SelectComplate; virtual;
     procedure SelectPart;
+    /// <summaryy 在指定的位置是否可接受插入、删除等操作 </summary>
+    function CanAccept(const AOffset: Integer; const AAction: THCItemAction): Boolean; virtual;
     /// <summary> 从指定位置将当前item分成前后两部分 </summary>
     /// <param name="AOffset">分裂位置</param>
     /// <returns>后半部分对应的Item</returns>
@@ -101,11 +140,19 @@ type
     procedure SaveToStream(const AStream: TStream; const AStart, AEnd: Integer); overload; virtual;
     procedure LoadFromStream(const AStream: TStream; const AStyle: THCStyle;
       const AFileVersion: Word); virtual;
+    function ToHtml(const APath: string): string; virtual;
+    procedure ToXml(const ANode: IHCXMLNode); virtual;
+    procedure ParseXml(const ANode: IHCXMLNode); virtual;
+
+    // 撤销重做相关方法
+    procedure Undo(const AUndoAction: THCCustomUndoAction); virtual;
+    procedure Redo(const ARedoAction: THCCustomUndoAction); virtual;
     //
     property Options: TItemOptions read FOptions;
     property Text: string read GetText write SetText;
     property Length: Integer read GetLength;
     property ParaFirst: Boolean read GetParaFirst write SetParaFirst;
+    property HyperLink: string read GetHyperLink write SetHyperLink;
 
     property IsSelectComplate: Boolean read GetSelectComplate;
     property IsSelectPart: Boolean read GetSelectPart;
@@ -121,14 +168,18 @@ type
 
   THCItems = class(TObjectList<THCCustomItem>)
   private
-    FOnItemInsert: TItemNotifyEvent;
+    FOnInsertItem, FOnRemoveItem: TItemNotifyEvent;
   protected
     procedure Notify(const Value: THCCustomItem; Action: TCollectionNotification); override;
   public
-    property OnItemInsert: TItemNotifyEvent read FOnItemInsert write FOnItemInsert;
+    property OnInsertItem: TItemNotifyEvent read FOnInsertItem write FOnInsertItem;
+    property OnRemoveItem: TItemNotifyEvent read FOnRemoveItem write FOnRemoveItem;
   end;
 
 implementation
+
+uses
+  SysUtils;
 
 { THCCustomItem }
 
@@ -139,8 +190,8 @@ end;
 
 procedure THCCustomItem.Assign(Source: THCCustomItem);
 begin
-  Self.FParaNo := Source.ParaNo;
   Self.FStyleNo := Source.StyleNo;
+  Self.FParaNo := Source.ParaNo;
   Self.FOptions := Source.Options;
 end;
 
@@ -150,6 +201,11 @@ begin
   Result := THCCustomItemClass(Self.ClassType).Create;
   Result.Assign(Self);
   Result.ParaFirst := False;  // 打断后，后面的肯定不是断首
+end;
+
+function THCCustomItem.CanAccept(const AOffset: Integer; const AAction: THCItemAction): Boolean;
+begin
+  Result := True;
 end;
 
 function THCCustomItem.CanConcatItems(const AItem: THCCustomItem): Boolean;
@@ -162,10 +218,11 @@ end;
 
 constructor THCCustomItem.Create;
 begin
-  FStyleNo := -1;
-  FParaNo := -1;
+  FStyleNo := THCStyle.Null;
+  FParaNo := THCStyle.Null;
   FFirstDItemNo := -1;
   FVisible := True;
+  FActive := False;
 end;
 
 procedure THCCustomItem.DblClick(const X, Y: Integer);
@@ -178,12 +235,17 @@ begin
 end;
 
 procedure THCCustomItem.DoPaint(const AStyle: THCStyle; const ADrawRect: TRect;
-  const ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
+  const ADataDrawTop, ADataDrawBottom, ADataScreenTop, ADataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 begin
 end;
 
 function THCCustomItem.GetHint: string;
+begin
+  Result := '';
+end;
+
+function THCCustomItem.GetHyperLink: string;
 begin
   Result := '';
 end;
@@ -250,22 +312,33 @@ begin
 end;
 
 procedure THCCustomItem.PaintTo(const AStyle: THCStyle; const ADrawRect: TRect;
-  const APageDataDrawBottom, APageDataScreenTop, APageDataScreenBottom: Integer;
+  const APageDataDrawTop, APageDataDrawBottom, APageDataScreenTop, APageDataScreenBottom: Integer;
   const ACanvas: TCanvas; const APaintInfo: TPaintInfo);
 var
   vDCState: Integer;
 begin
   vDCState := Windows.SaveDC(ACanvas.Handle);
   try
-    DoPaint(AStyle, ADrawRect, APageDataDrawBottom, APageDataScreenTop,
-      APageDataScreenBottom, ACanvas, APaintInfo);
+    DoPaint(AStyle, ADrawRect, APageDataDrawTop, APageDataDrawBottom,
+      APageDataScreenTop, APageDataScreenBottom, ACanvas, APaintInfo);
   finally
     Windows.RestoreDC(ACanvas.Handle, vDCState);
-    ACanvas.Refresh;  // 恢复Pen的修改
+    ACanvas.Refresh;  // 处理下一个使用Pen时修改Pen的属性值和当前属性值一样时，不会触发Canvas重新SelectPen导致Pen的绘制失效的问题
   end;
 end;
 
 procedure THCCustomItem.PaintTop(const ACanvas: TCanvas);
+begin
+end;
+
+procedure THCCustomItem.ParseXml(const ANode: IHCXMLNode);
+begin
+  FStyleNo := ANode.Attributes['sno'];
+  FParaNo := ANode.Attributes['pno'];
+  Self.ParaFirst := ANode.Attributes['parafirst'];
+end;
+
+procedure THCCustomItem.Redo(const ARedoAction: THCCustomUndoAction);
 begin
 end;
 
@@ -282,6 +355,22 @@ begin
 end;
 
 procedure THCCustomItem.SetText(const Value: string);
+begin
+end;
+
+function THCCustomItem.ToHtml(const APath: string): string;
+begin
+  Result := '';
+end;
+
+procedure THCCustomItem.ToXml(const ANode: IHCXMLNode);
+begin
+  ANode.Attributes['sno'] := FStyleNo;
+  ANode.Attributes['pno'] := FParaNo;
+  ANode.Attributes['parafirst'] := Self.ParaFirst;
+end;
+
+procedure THCCustomItem.Undo(const AUndoAction: THCCustomUndoAction);
 begin
 end;
 
@@ -304,7 +393,12 @@ end;
 
 procedure THCCustomItem.SetActive(const Value: Boolean);
 begin
-  FActive := Value;
+  if FActive <> Value then
+    FActive := Value;
+end;
+
+procedure THCCustomItem.SetHyperLink(const Value: string);
+begin
 end;
 
 procedure THCCustomItem.SetParaFirst(const Value: Boolean);
@@ -320,17 +414,22 @@ end;
 procedure THCItems.Notify(const Value: THCCustomItem;
   Action: TCollectionNotification);
 begin
-  inherited;
   case Action of
     cnAdded:
       begin
-        if Assigned(FOnItemInsert) then
-          FOnItemInsert(Value);
+        if Assigned(FOnInsertItem) then
+          FOnInsertItem(Value);
       end;
 
-    cnRemoved: ;
+    cnRemoved:
+      begin
+        if Assigned(FOnRemoveItem) then
+          FOnRemoveItem(Value);
+      end;
     cnExtracted: ;
   end;
+
+  inherited Notify(Value, Action);
 end;
 
 { TPaintInfo }
@@ -338,12 +437,65 @@ end;
 constructor TPaintInfo.Create;
 begin
   FTopItems := TObjectList<THCCustomItem>.Create(False);  // 只管理不负责释放
+  FScaleX := 1;
+  FScaleY := 1;
+  FZoom := 1;
 end;
 
 destructor TPaintInfo.Destroy;
 begin
   FTopItems.Free;
   inherited Destroy;
+end;
+
+procedure TPaintInfo.DrawNoScaleLine(const ACanvas: TCanvas;
+  const APoints: array of TPoint);
+var
+  vPt: TPoint;
+  i: Integer;
+begin
+  SetViewportExtEx(ACanvas.Handle, FWindowWidth, FWindowHeight, @vPt);
+  try
+    ACanvas.MoveTo(GetScaleX(APoints[0].X), GetScaleY(APoints[0].Y));
+    for i := 1 to Length(APoints) - 1 do
+      ACanvas.LineTo(GetScaleX(APoints[i].X), GetScaleY(APoints[i].Y));
+  finally
+    SetViewportExtEx(ACanvas.Handle, Round(FWindowWidth * FScaleX),
+      Round(FWindowHeight * FScaleY), @vPt);
+  end;
+end;
+
+function TPaintInfo.GetScaleX(const AValue: Integer): Integer;
+begin
+  Result := Round(AValue * FScaleX);
+end;
+
+function TPaintInfo.GetScaleY(const AValue: Integer): Integer;
+begin
+  Result := Round(AValue * FScaleY);
+end;
+
+procedure TPaintInfo.RestoreCanvasScale(const ACanvas: TCanvas;
+  const AOldInfo: TScaleInfo);
+begin
+  SetViewportOrgEx(ACanvas.Handle, AOldInfo.ViewportOrg.cx, AOldInfo.ViewportOrg.cy, nil);
+  SetViewportExtEx(ACanvas.Handle, AOldInfo.ViewportExt.cx, AOldInfo.ViewportExt.cy, nil);
+  SetWindowOrgEx(ACanvas.Handle, AOldInfo.WindowOrg.cx, AOldInfo.WindowOrg.cy, nil);
+  SetWindowExtEx(ACanvas.Handle, AOldInfo.WindowExt.cx, AOldInfo.WindowExt.cy, nil);
+  SetMapMode(ACanvas.Handle, AOldInfo.MapMode);
+end;
+
+function TPaintInfo.ScaleCanvas(const ACanvas: TCanvas): TScaleInfo;
+begin
+  Result.MapMode := GetMapMode(ACanvas.Handle);  // 返回映射方式，零则失败
+  SetMapMode(ACanvas.Handle, MM_ANISOTROPIC);  // 逻辑单位转换成具有任意比例轴的任意单位，用SetWindowsEx和SetViewportExtEx函数指定单位、方向和需要的比例
+  SetWindowOrgEx(ACanvas.Handle, 0, 0, @Result.WindowOrg);  // 用指定的坐标设置设备环境的窗口原点
+  SetWindowExtEx(ACanvas.Handle, FWindowWidth, FWindowHeight, @Result.WindowExt);  // 为设备环境设置窗口的水平的和垂直的范围
+
+  SetViewportOrgEx(ACanvas.Handle, 0, 0, @Result.ViewportOrg);  // 哪个设备点映射到窗口原点(0,0)
+  // 用指定的值来设置指定设备环境坐标的X轴、Y轴范围
+  SetViewportExtEx(ACanvas.Handle, Round(FWindowWidth * FScaleX),
+    Round(FWindowHeight * FScaleY), @Result.ViewportExt);
 end;
 
 end.
